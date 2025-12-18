@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+  Tailwind v4 (CSS-first): when using a `src/` directory, it can help to declare
+  explicit sources so class detection is rock-solid.
+*/
+@source "./**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../lib/**/*.{js,ts,jsx,tsx,mdx}";
+
+html,
+body {
+  height: 100%;
+}
+
+@layer base {
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-black dark:text-zinc-50;
+  }
+
+  ::selection {
+    @apply bg-zinc-900 text-white dark:bg-white dark:text-zinc-900;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-6xl px-4;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950;
+  }
+
+  .muted {
+    @apply text-sm text-zinc-600 dark:text-zinc-400;
+  }
+
+  .table-th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400;
+  }
+
+  .table-td {
+    @apply px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200;
+  }
+}
