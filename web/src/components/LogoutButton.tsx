@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function LogoutButton({ className = "" }: { className?: string }) {
+export function LogoutButton() {
   const router = useRouter();
 
   async function onLogout() {
@@ -17,10 +17,7 @@ export function LogoutButton({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={onLogout}
-      className={
-        "inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900 " +
-        className
-      }
+      className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
     >
       Sair
     </button>

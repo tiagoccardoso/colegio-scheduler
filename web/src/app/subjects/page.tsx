@@ -129,7 +129,7 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
                       <div className="flex flex-wrap items-center gap-2">
                         <details>
                           <summary className="cursor-pointer text-sm font-semibold">Editar</summary>
-                          <form action={updateAction} className="mt-3 grid w-full max-w-sm gap-3">
+                          <form action={updateAction} className="mt-3 grid w-[340px] gap-3">
                             <input type="hidden" name="id" value={row.id} />
                             <label className="grid gap-2">
   <span className="text-sm font-semibold">Nome</span>

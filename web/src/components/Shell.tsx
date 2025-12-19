@@ -1,8 +1,16 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { LogoutButton } from "@/components/LogoutButton";
-import { MobileNav } from "@/components/MobileNav";
-import { NavLinks } from "@/components/NavLinks";
+import { LogoutButton } from "./LogoutButton";
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-900 dark:hover:text-white"
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function Shell({
   title,
@@ -11,64 +19,36 @@ export function Shell({
 }: {
   title: string;
   subtitle?: string;
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
-      <div className="page-container py-6">
-        <div className="flex gap-6">
-          {/* Sidebar (desktop) */}
-          <aside className="hidden w-[280px] shrink-0 lg:block">
-            <div className="panel sticky top-6 p-4">
-              <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
-                Colégio Scheduler
-              </Link>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Painel do diretor</p>
-
-              <div className="mt-4">
-                <NavLinks variant="sidebar" />
-              </div>
-
-              <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-900">
-                <LogoutButton className="w-full justify-center" />
-              </div>
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              {subtitle ? <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{subtitle}</p> : null}
             </div>
-          </aside>
-
-          {/* Main */}
-          <div className="min-w-0 flex-1">
-            <header className="panel p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3 lg:hidden">
-                    <MobileNav />
-                    <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
-                      Colégio Scheduler
-                    </Link>
-                  </div>
-
-                  <h1 className="mt-2 text-2xl font-semibold tracking-tight lg:mt-0">{title}</h1>
-                  {subtitle ? <p className="mt-1 muted">{subtitle}</p> : null}
-                </div>
-
-                {/* Desktop logout (mobile logout lives inside the drawer) */}
-                <div className="hidden lg:block">
-                  <LogoutButton />
-                </div>
-              </div>
-
-              <div className="mt-4 lg:hidden">
-                <NavLinks />
-              </div>
-            </header>
-
-            <main className="mt-6">{children}</main>
-
-            <footer className="mt-10 text-center text-xs text-zinc-500 dark:text-zinc-400">
-              MVP — Colégio Scheduler
-            </footer>
+            <LogoutButton />
           </div>
-        </div>
+
+          <nav className="mt-4 flex flex-wrap gap-1">
+            <NavLink href="/dashboard">Dashboard</NavLink>
+            <NavLink href="/subjects">Disciplinas</NavLink>
+            <NavLink href="/rooms">Salas</NavLink>
+            <NavLink href="/classes">Turmas</NavLink>
+            <NavLink href="/teachers">Professores</NavLink>
+            <NavLink href="/time-slots">Horários</NavLink>
+            <NavLink href="/schedule">Grade</NavLink>
+          </nav>
+        </header>
+
+        <main className="mt-6">{children}</main>
+
+        <footer className="mt-10 text-center text-xs text-zinc-500">
+          MVP — Colégio Scheduler
+        </footer>
       </div>
     </div>
   );

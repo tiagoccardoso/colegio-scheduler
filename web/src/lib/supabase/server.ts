@@ -6,7 +6,8 @@ import { createServerClient } from "@supabase/ssr";
 type CookieToSet = { name: string; value: string; options?: any };
 
 export async function createClient() {
-  // Next.js 16: cookies() is async.
+  // Next.js 16: `cookies()` is an async dynamic API.
+  // It must be awaited before accessing methods like `.getAll()`.
   const cookieStore = await cookies();
 
   return createServerClient(

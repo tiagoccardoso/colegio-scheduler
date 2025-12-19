@@ -41,7 +41,7 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
-    redirect("/rooms?msg=" + encodeMsg("Sala criada com sucesso."));
+    redirect("/rooms?msg=" + encodeMsg("Salas criada com sucesso."));
   }
 
   async function updateAction(formData: FormData) {
@@ -64,7 +64,7 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
-    redirect("/rooms?msg=" + encodeMsg("Sala atualizada."));
+    redirect("/rooms?msg=" + encodeMsg("Salas atualizada."));
   }
 
   async function deleteAction(formData: FormData) {
@@ -78,7 +78,7 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
-    redirect("/rooms?msg=" + encodeMsg("Sala removida."));
+    redirect("/rooms?msg=" + encodeMsg("Salas removida."));
   }
 
   return (
@@ -144,7 +144,7 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
                       <div className="flex flex-wrap items-center gap-2">
                         <details>
                           <summary className="cursor-pointer text-sm font-semibold">Editar</summary>
-                          <form action={updateAction} className="mt-3 grid w-full max-w-sm gap-3">
+                          <form action={updateAction} className="mt-3 grid w-[340px] gap-3">
                             <input type="hidden" name="id" value={row.id} />
                             <label className="grid gap-2">
   <span className="text-sm font-semibold">Nome</span>

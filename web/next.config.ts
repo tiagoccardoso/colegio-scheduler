@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   experimental: {
     serverSourceMaps: false,
   },
+  webpack(config, { dev }) {
+    // In dev, disable sourcemap generation to avoid noisy "Invalid source map" warnings
+    // coming from dependencies on Windows.
+    if (dev) config.devtool = false;
+    return config;
+  },
 };
 
 export default nextConfig;

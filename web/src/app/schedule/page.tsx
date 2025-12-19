@@ -5,6 +5,10 @@ import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { decodeMsg, encodeMsg } from "@/lib/flash";
+import { ScheduleClassPicker } from "@/components/ScheduleClassPicker";
+import { ScheduleAssistant } from "@/components/ScheduleAssistant";
+import { ScheduleAutoBuilder } from "@/components/ScheduleAutoBuilder";
+import { validateNoConflicts } from "@/lib/schedule/validate";
 
 type ClassRow = { id: string; name: string; shift: string | null };
 type SubjectRow = { id: string; name: string };
@@ -79,6 +83,8 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
   const scheduleBySlot = new Map<string, ScheduleRow>();
   schedules.forEach((s) => scheduleBySlot.set(s.time_slot_id, s));
 
+  const aiEnabled = process.env.AI_SCHEDULER_ENABLED === "true" && Boolean(process.env.OPENAI_API_KEY);
+
   async function upsertAction(formData: FormData) {
     "use server";
     const { supabase, profile } = await requireDirector();
@@ -92,6 +98,68 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
     if (!class_id || !time_slot_id || !subject_id || !teacher_id) {
       redirect("/schedule?error=" + encodeMsg("Preencha os campos obrigatórios."));
+    }
+
+    // Validate teacher constraints and conflict rules
+    const { data: slot } = await supabase
+      .from("time_slots")
+      .select("id,weekday")
+      .eq("id", time_slot_id)
+      .maybeSingle();
+
+    const { data: teacher } = await supabase
+      .from("teachers")
+      .select("id,subject_ids,class_ids,room_ids,available_weekdays")
+      .eq("id", teacher_id)
+      .maybeSingle();
+
+    if (!slot || !teacher) {
+      redirect("/schedule?classId=" + encodeURIComponent(class_id) + "&error=" + encodeMsg("Professor ou horário inválido."));
+    }
+
+    const available = ((teacher as any).available_weekdays ?? []) as number[];
+    if (available.length && !available.includes(slot.weekday)) {
+      redirect(
+        "/schedule?classId=" +
+          encodeURIComponent(class_id) +
+          "&error=" +
+          encodeMsg("Professor indisponível neste dia da semana."),
+      );
+    }
+
+    const allowedClasses = (((teacher as any).class_ids ?? []) as string[]).filter(Boolean);
+    if (allowedClasses.length && !allowedClasses.includes(class_id)) {
+      redirect(
+        "/schedule?classId=" +
+          encodeURIComponent(class_id) +
+          "&error=" +
+          encodeMsg("Professor não está habilitado para esta turma."),
+      );
+    }
+
+    const allowedSubjects = (((teacher as any).subject_ids ?? []) as string[]).filter(Boolean);
+    if (allowedSubjects.length && !allowedSubjects.includes(subject_id)) {
+      redirect(
+        "/schedule?classId=" +
+          encodeURIComponent(class_id) +
+          "&error=" +
+          encodeMsg("Professor não está habilitado para esta disciplina."),
+      );
+    }
+
+    const allowedRooms = (((teacher as any).room_ids ?? []) as string[]).filter(Boolean);
+    if (room_id && allowedRooms.length && !allowedRooms.includes(room_id)) {
+      redirect(
+        "/schedule?classId=" +
+          encodeURIComponent(class_id) +
+          "&error=" +
+          encodeMsg("Professor não está habilitado para esta sala."),
+      );
+    }
+
+    const conflict = await validateNoConflicts({ supabase, class_id, time_slot_id, teacher_id, room_id });
+    if (conflict) {
+      redirect("/schedule?classId=" + encodeURIComponent(class_id) + "&error=" + encodeMsg(conflict.message));
     }
 
     const { data: existing } = await supabase
@@ -144,36 +212,28 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
         <Flash message={error || msg} variant={error ? "error" : msg ? "success" : "info"} />
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-          <form
-            className="flex flex-wrap items-end gap-3"
-            action={async (formData: FormData) => {
-              "use server";
-              const cid = String(formData.get("classId") || "");
-              if (!cid) redirect("/schedule");
-              redirect("/schedule?classId=" + encodeURIComponent(cid));
-            }}
-          >
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold">Turma</span>
-              <select
-                name="classId"
-                defaultValue={classId ?? ""}
-                className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/30 sm:min-w-[260px]"
-              >
-                <option value="" disabled>Selecione...</option>
-                {(classes as ClassRow[] | null)?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.shift ? `(${c.shift})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button type="submit" className="h-10 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
-              Carregar
-            </button>
-          </form>
+          {/*
+            IMPORTANT:
+            We intentionally avoid a Server Action here.
+            Navigation via Server Action can fail silently in some dev/prod setups.
+            This client component uses a full page navigation with querystring which is robust.
+          */}
+          <ScheduleClassPicker classes={((classes as ClassRow[] | null) ?? [])} initialClassId={classId} />
         </div>
+
+        {classId ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ScheduleAutoBuilder enabled={aiEnabled} classId={classId} />
+            <ScheduleAssistant
+              enabled={aiEnabled}
+              classId={classId}
+              teachers={((teachers as TeacherRow[] | null) ?? [])}
+              subjects={((subjects as SubjectRow[] | null) ?? [])}
+              rooms={((rooms as RoomRow[] | null) ?? [])}
+              timeSlots={((timeSlots as TimeSlotRow[] | null) ?? [])}
+            />
+          </div>
+        ) : null}
 
         {!classId ? <p className="text-sm text-zinc-600 dark:text-zinc-400">Selecione uma turma para visualizar a grade.</p> : null}
 
