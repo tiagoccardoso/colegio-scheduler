@@ -10,27 +10,42 @@ type Row = {
   id: string;
   name: string | null;
   shift: string | null;
+  level?: string | null;
+  stage?: string | null;
+  default_room_id?: string | null;
+  display_order?: number | null;
 };
 
-export default async function Page({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
-  const { supabase } = await requireDirector();
+const SHIFT_OPTIONS: { key: string; label: string }[] = [
+  { key: "MANHA", label: "Manhã" },
+  { key: "TARDE", label: "Tarde" },
+  { key: "NOITE", label: "Noite" },
+];
 
-  const msg = typeof searchParams?.msg === "string" ? decodeMsg(searchParams?.msg) : null;
-  const error = typeof searchParams?.error === "string" ? decodeMsg(searchParams?.error) : null;
+export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const { supabase, profile } = await requireDirector();
+  const sp = (await searchParams) ?? {};
+
+
+  const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
+  const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
   const { data: rows, error: loadError } = await supabase
     .from("classes")
-    .select("id, name, shift")
-    .order("created_at", { ascending: false });
+    .select("id, name, shift, level, stage, default_room_id, display_order")
+    .eq("school_id", profile.school_id)
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
 
   async function createAction(formData: FormData) {
     "use server";
     const { supabase, profile } = await requireDirector();
 
+    const rawShift = String(formData.get("shift") || "").trim().toUpperCase();
     const payload: any = {
       school_id: profile.school_id,
       name: String(formData.get("name") || "").trim() || null,
-      shift: String(formData.get("shift") || "").trim() || null,
+      shift: SHIFT_OPTIONS.some((s) => s.key === rawShift) ? rawShift : null,
     };
 
     if (!payload["name"]) {
@@ -46,21 +61,26 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/classes?error=" + encodeMsg("ID inválido."));
 
+    const rawShift = String(formData.get("shift") || "").trim().toUpperCase();
     const payload: any = {
       name: String(formData.get("name") || "").trim() || null,
       shift: String(formData.get("shift") || "").trim() || null,
+      level: String(formData.get("level") || "").trim() || null,
+      stage: String(formData.get("stage") || "").trim() || null,
+      default_room_id: String(formData.get("default_room_id") || "").trim() || null,
+      display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
     if (!payload["name"]) {
       redirect("/classes?error=" + encodeMsg("Preencha o campo Nome."));
     }
 
-    const { error } = await supabase.from("classes").update(payload).eq("id", id);
+    const { error } = await supabase.from("classes").update(payload).eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/classes?error=" + encodeMsg(error.message));
 
     revalidatePath("/classes");
@@ -69,12 +89,12 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/classes?error=" + encodeMsg("ID inválido."));
 
-    const { error } = await supabase.from("classes").delete().eq("id", id);
+    const { error } = await supabase.from("classes").delete().eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/classes?error=" + encodeMsg(error.message));
 
     revalidatePath("/classes");
@@ -94,25 +114,30 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
             <summary className="cursor-pointer text-sm font-semibold">Cadastrar</summary>
             <form action={createAction} className="mt-4 grid max-w-xl gap-4">
               <label className="grid gap-2">
-  <span className="text-sm font-semibold">Nome</span>
-  <input
-    name="name"
-    type="text"
+                <span className="text-sm font-semibold">Nome</span>
+                <input
+                  name="name"
+                  type="text"
+                  required
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                />
+              </label>
 
-    required
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
-<label className="grid gap-2">
-  <span className="text-sm font-semibold">Turno</span>
-  <input
-    name="shift"
-    type="text"
-
-
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Turno</span>
+                <select
+                  name="shift"
+                  defaultValue=""
+                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                >
+                  <option value="">—</option>
+                  {SHIFT_OPTIONS.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="submit"
                 className="w-fit rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
@@ -147,25 +172,31 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
                           <form action={updateAction} className="mt-3 grid w-[340px] gap-3">
                             <input type="hidden" name="id" value={row.id} />
                             <label className="grid gap-2">
-  <span className="text-sm font-semibold">Nome</span>
-  <input
-    name="name"
-    type="text"
-    defaultValue={row.name ?? ""}
-    required
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
-<label className="grid gap-2">
-  <span className="text-sm font-semibold">Turno</span>
-  <input
-    name="shift"
-    type="text"
-    defaultValue={row.shift ?? ""}
+                              <span className="text-sm font-semibold">Nome</span>
+                              <input
+                                name="name"
+                                type="text"
+                                defaultValue={row.name ?? ""}
+                                required
+                                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                              />
+                            </label>
 
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
+                            <label className="grid gap-2">
+                              <span className="text-sm font-semibold">Turno</span>
+                              <select
+                                name="shift"
+                                defaultValue={(row.shift ?? "").toUpperCase()}
+                                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                              >
+                                <option value="">—</option>
+                                {SHIFT_OPTIONS.map((s) => (
+                                  <option key={s.key} value={s.key}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
                             <button
                               type="submit"
                               className="w-fit rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"

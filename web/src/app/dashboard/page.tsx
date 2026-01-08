@@ -10,8 +10,13 @@ export default async function DashboardPage() {
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
           <h2 className="text-lg font-semibold">Fluxo recomendado</h2>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-            <li>Cadastre Disciplinas, Salas, Turmas, Professores e Horários</li>
-            <li>Monte a grade manual em <strong>Grade</strong></li>
+            <li>Cadastre <strong>Disciplinas</strong></li>
+            <li>Cadastre <strong>Salas</strong></li>
+            <li>Cadastre <strong>Turmas</strong></li>
+            <li>Cadastre <strong>Horários</strong></li>
+            <li>Cadastre <strong>Professores</strong></li>
+            <li>Monte a grade em <strong>Montar grade</strong></li>
+            <li>Revise e ajuste em <strong>Grade semanal</strong></li>
           </ol>
         </div>
       </div>

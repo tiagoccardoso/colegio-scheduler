@@ -9,7 +9,7 @@ const WEEKDAY_LABEL: Record<number, string> = {
 };
 
 type ConflictInfo = {
-  kind: "teacher" | "room";
+  kind: "teacher" | "room" | "class";
   message: string;
 };
 
@@ -23,8 +23,34 @@ export async function validateNoConflicts(args: {
   time_slot_id: string;
   teacher_id: string;
   room_id: string | null;
+  schedule_id?: string | null;
 }): Promise<ConflictInfo | null> {
-  const { supabase, class_id, time_slot_id, teacher_id, room_id } = args;
+  const { supabase, class_id, time_slot_id, teacher_id, room_id, schedule_id } = args;
+
+  // Class conflict: same class already has a lesson in the same time slot.
+  if (class_id) {
+    const q = supabase
+      .from("schedules")
+      .select(
+        "teacher:teachers(name), subject:subjects(name), slot:time_slots(weekday,starts_at,ends_at)",
+      )
+      .eq("class_id", class_id)
+      .eq("time_slot_id", time_slot_id)
+      .limit(1);
+
+    const { data: cConflict } = schedule_id ? await q.neq("id", schedule_id) : await q;
+    const c = (cConflict as any)?.[0];
+    if (c) {
+      const w = WEEKDAY_LABEL?.[c.slot?.weekday ?? 0] ?? "Dia";
+      const range = c.slot?.starts_at ? `${c.slot.starts_at}–${c.slot.ends_at}` : "";
+      const t = c.teacher?.name ? ` (${c.teacher.name})` : "";
+      const subj = c.subject?.name ? ` — ${c.subject.name}` : "";
+      return {
+        kind: "class",
+        message: `Conflito: a turma já tem aula em ${w} ${range}${subj}${t}.`,
+      };
+    }
+  }
 
   // Teacher conflict: same teacher in another class at the same time slot.
   if (teacher_id) {
@@ -35,7 +61,7 @@ export async function validateNoConflicts(args: {
       )
       .eq("teacher_id", teacher_id)
       .eq("time_slot_id", time_slot_id)
-      .neq("class_id", class_id)
+      .neq("id", schedule_id ?? "00000000-0000-0000-0000-000000000000")
       .limit(1);
 
     const c = (tConflict as any)?.[0];
@@ -60,7 +86,7 @@ export async function validateNoConflicts(args: {
       )
       .eq("room_id", room_id)
       .eq("time_slot_id", time_slot_id)
-      .neq("class_id", class_id)
+      .neq("id", schedule_id ?? "00000000-0000-0000-0000-000000000000")
       .limit(1);
 
     const c = (rConflict as any)?.[0];

@@ -10,18 +10,25 @@ type Row = {
   id: string;
   name: string | null;
   room_type: string | null;
+  room_number?: number | null;
+  display_order?: number | null;
 };
 
-export default async function Page({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
-  const { supabase } = await requireDirector();
+export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const { supabase, profile } = await requireDirector();
+  const sp = (await searchParams) ?? {};
 
-  const msg = typeof searchParams?.msg === "string" ? decodeMsg(searchParams?.msg) : null;
-  const error = typeof searchParams?.error === "string" ? decodeMsg(searchParams?.error) : null;
+
+  const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
+  const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
   const { data: rows, error: loadError } = await supabase
     .from("rooms")
-    .select("id, name, room_type")
-    .order("created_at", { ascending: false });
+    .select("id, name, room_type, room_number, display_order")
+    .eq("school_id", profile.school_id)
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("room_number", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
 
   async function createAction(formData: FormData) {
     "use server";
@@ -31,6 +38,8 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
       school_id: profile.school_id,
       name: String(formData.get("name") || "").trim() || null,
       room_type: String(formData.get("room_type") || "").trim() || null,
+      room_number: formData.get("room_number") ? Number(formData.get("room_number")) : null,
+      display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
     if (!payload["name"]) {
@@ -46,7 +55,7 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/rooms?error=" + encodeMsg("ID inválido."));
@@ -54,13 +63,15 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
     const payload: any = {
       name: String(formData.get("name") || "").trim() || null,
       room_type: String(formData.get("room_type") || "").trim() || null,
+      room_number: formData.get("room_number") ? Number(formData.get("room_number")) : null,
+      display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
     if (!payload["name"]) {
       redirect("/rooms?error=" + encodeMsg("Preencha o campo Nome."));
     }
 
-    const { error } = await supabase.from("rooms").update(payload).eq("id", id);
+    const { error } = await supabase.from("rooms").update(payload).eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
@@ -69,12 +80,12 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/rooms?error=" + encodeMsg("ID inválido."));
 
-    const { error } = await supabase.from("rooms").delete().eq("id", id);
+    const { error } = await supabase.from("rooms").delete().eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");

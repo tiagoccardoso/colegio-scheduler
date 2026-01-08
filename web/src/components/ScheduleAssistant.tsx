@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 type TeacherRow = { id: string; name: string };
 type SubjectRow = { id: string; name: string };
 type RoomRow = { id: string; name: string };
-type TimeSlotRow = { id: string; weekday: number; starts_at: string; ends_at: string };
+type TimeSlotRow = { id: string; weekday: number; starts_at: string; ends_at: string; shift?: string | null; period_index?: number | null };
 
 const WEEKDAY_LABEL: Record<number, string> = {
   1: "Seg",
@@ -17,7 +17,9 @@ const WEEKDAY_LABEL: Record<number, string> = {
 
 function slotLabel(ts: TimeSlotRow) {
   const w = WEEKDAY_LABEL?.[ts.weekday] ?? "Dia";
-  return `${w} ${ts.starts_at}–${ts.ends_at}`;
+  const p = ts.period_index ? `${ts.period_index}º ` : "";
+  const sh = ts.shift ? ` (${ts.shift})` : "";
+  return `${w} ${p}${ts.starts_at}–${ts.ends_at}${sh}`;
 }
 
 export function ScheduleAssistant(props: {

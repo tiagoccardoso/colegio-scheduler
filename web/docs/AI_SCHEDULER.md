@@ -6,9 +6,12 @@ O Assistente IA sugere alternativas para montar/ajustar a grade sem conflitos de
 
 Agora ele também pode **gerar/ completar a grade automaticamente** (por turma), respeitando:
 
-- Disponibilidade do professor (dias da semana)
+- Turno do professor (pode atender mais de um turno)
+- Disponibilidade do professor (dia **e período**)
 - Disciplinas, turmas e salas permitidas por professor
 - Conflitos já existentes (professor/sala)
+
+Quando existir matriz curricular (tabela `class_subject_requirements`), a geração também tenta **distribuir as aulas sem ultrapassar** a carga semanal por disciplina.
 
 Existem 2 modos:
 

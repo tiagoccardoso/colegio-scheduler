@@ -17,7 +17,7 @@ export async function requireDirector() {
     .eq("user_id", user.id)
     .single();
 
-  if (error || !profile) redirect("/login");
+  if (error || !profile) redirect("/onboarding");
   if (profile.role !== "director") redirect("/forbidden");
 
   return { supabase, user, profile: profile as Profile };

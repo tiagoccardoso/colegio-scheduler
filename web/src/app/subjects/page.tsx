@@ -9,18 +9,24 @@ import { decodeMsg, encodeMsg } from "@/lib/flash";
 type Row = {
   id: string;
   name: string | null;
+  short_name?: string | null;
+  display_order?: number | null;
 };
 
-export default async function Page({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
-  const { supabase } = await requireDirector();
+export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const { supabase, profile } = await requireDirector();
+  const sp = (await searchParams) ?? {};
 
-  const msg = typeof searchParams?.msg === "string" ? decodeMsg(searchParams?.msg) : null;
-  const error = typeof searchParams?.error === "string" ? decodeMsg(searchParams?.error) : null;
+
+  const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
+  const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
   const { data: rows, error: loadError } = await supabase
     .from("subjects")
-    .select("id, name")
-    .order("created_at", { ascending: false });
+    .select("id, name, short_name, display_order")
+    .eq("school_id", profile.school_id)
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
 
   async function createAction(formData: FormData) {
     "use server";
@@ -29,6 +35,8 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
     const payload: any = {
       school_id: profile.school_id,
       name: String(formData.get("name") || "").trim() || null,
+      short_name: String(formData.get("short_name") || "").trim() || null,
+      display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
     if (!payload["name"]) {
@@ -44,20 +52,22 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/subjects?error=" + encodeMsg("ID inválido."));
 
     const payload: any = {
       name: String(formData.get("name") || "").trim() || null,
+      short_name: String(formData.get("short_name") || "").trim() || null,
+      display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
     if (!payload["name"]) {
       redirect("/subjects?error=" + encodeMsg("Preencha o campo Nome."));
     }
 
-    const { error } = await supabase.from("subjects").update(payload).eq("id", id);
+    const { error } = await supabase.from("subjects").update(payload).eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/subjects?error=" + encodeMsg(error.message));
 
     revalidatePath("/subjects");
@@ -66,12 +76,12 @@ export default async function Page({ searchParams }: { searchParams?: Record<str
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/subjects?error=" + encodeMsg("ID inválido."));
 
-    const { error } = await supabase.from("subjects").delete().eq("id", id);
+    const { error } = await supabase.from("subjects").delete().eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/subjects?error=" + encodeMsg(error.message));
 
     revalidatePath("/subjects");

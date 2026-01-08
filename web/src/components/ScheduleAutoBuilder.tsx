@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-export function ScheduleAutoBuilder(props: { enabled: boolean; classId: string }) {
-  const { enabled, classId } = props;
+export function ScheduleAutoBuilder(props: { enabled: boolean; classId: string; shift?: string | null }) {
+  const { enabled, classId, shift } = props;
 
   const [overwrite, setOverwrite] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export function ScheduleAutoBuilder(props: { enabled: boolean; classId: string }
       const res = await fetch("/api/ai/build-schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ classId, overwrite }),
+        body: JSON.stringify({ classId, overwrite, shift }),
       });
 
       const json = await res.json();
@@ -53,7 +53,7 @@ export function ScheduleAutoBuilder(props: { enabled: boolean; classId: string }
         <div>
           <h3 className="text-sm font-semibold">Gerar grade com IA</h3>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Preenche automaticamente os horários da turma (respeitando conflitos e as restrições do professor).
+            Preenche automaticamente os horários da turma (respeitando conflitos e as restrições do professor). Se houver matriz curricular cadastrada, respeita a carga semanal por disciplina.
           </p>
         </div>
 

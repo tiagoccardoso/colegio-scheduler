@@ -5,6 +5,7 @@ alter table public.teachers
   add column if not exists subject_ids uuid[] not null default '{}'::uuid[],
   add column if not exists class_ids uuid[] not null default '{}'::uuid[],
   add column if not exists room_ids uuid[] not null default '{}'::uuid[],
+  add column if not exists teaching_rules jsonb not null default '[]'::jsonb,
   add column if not exists restrictions text,
   add column if not exists available_weekdays int[] not null default '{1,2,3,4,5}'::int[];
 
@@ -30,9 +31,11 @@ set
   subject_ids = coalesce(subject_ids, '{}'::uuid[]),
   class_ids = coalesce(class_ids, '{}'::uuid[]),
   room_ids = coalesce(room_ids, '{}'::uuid[]),
+  teaching_rules = coalesce(teaching_rules, '[]'::jsonb),
   available_weekdays = coalesce(available_weekdays, '{1,2,3,4,5}'::int[])
 where
   subject_ids is null
   or class_ids is null
   or room_ids is null
+  or teaching_rules is null
   or available_weekdays is null;
