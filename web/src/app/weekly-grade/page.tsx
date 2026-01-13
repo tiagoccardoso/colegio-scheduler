@@ -26,8 +26,9 @@ type ScheduleRow = {
   id: string;
   time_slot_id: string;
   teacher_id: string;
-  class_id: string;
-  subject_id: string;
+  activity_type: string | null;
+  class_id: string | null;
+  subject_id: string | null;
   room_id: string | null;
   notes: string | null;
   time_slot: { weekday: number; period_index: number | null; shift: string | null } | null;
@@ -57,7 +58,6 @@ export default async function Page({
 }) {
   const { supabase, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};
-
 
   const shift =
     typeof sp.shift === "string" && SHIFT_OPTIONS.some((s) => s.key === sp.shift)
@@ -110,7 +110,7 @@ export default async function Page({
     const { data: sched } = await supabase
       .from("schedules")
       .select(
-        "id,time_slot_id,teacher_id,class_id,subject_id,room_id,notes,time_slot:time_slots(weekday,period_index,shift),class:classes(name,shift),subject:subjects(name),room:rooms(name)",
+        "id,time_slot_id,teacher_id,activity_type,class_id,subject_id,room_id,notes,time_slot:time_slots(weekday,period_index,shift),class:classes(name,shift),subject:subjects(name),room:rooms(name)",
       )
       .eq("school_id", profile.school_id)
       .in("time_slot_id", timeSlotIds);
@@ -128,13 +128,11 @@ export default async function Page({
   const noCalendar = timeSlotIds.length === 0;
 
   return (
-    <Shell title="Grade semanal" subtitle="Arraste e solte para mover aulas. Clique em um slot para editar.">
+    <Shell title="Grade semanal" subtitle="Arraste e solte para mover aulas/HA. Clique em um slot para editar.">
       <div className="grid gap-4">
         <Flash
           message={
-            noCalendar
-              ? "Nenhum horário encontrado para este turno. Configure em Horários."
-              : null
+            noCalendar ? "Nenhum horário encontrado para este turno. Configure em Horários." : null
           }
           variant={noCalendar ? "info" : "info"}
         />

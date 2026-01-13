@@ -40,3 +40,9 @@ Quando houver matriz configurada para uma turma, a geração automática passa a
 - priorizar cumprir a carga semanal por disciplina
 - não exceder a quantidade definida por disciplina
 - manter o validador anti-conflito (professor/sala) como “última barreira”
+
+## Intervalo por turno (Horários)
+
+Rode o script `shift_settings.sql` para criar a tabela `shift_settings`, que guarda o **intervalo (minutos)** entre períodos por **turno**.
+
+A tela **Horários** pode usar esse valor durante a geração automática do calendário.

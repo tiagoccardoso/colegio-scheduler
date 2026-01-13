@@ -21,12 +21,15 @@ type TimeSlotRow = {
   ends_at: string;
 };
 
+type ActivityType = "AULA" | "HA";
+
 type ScheduleRow = {
   id: string;
   time_slot_id: string;
   teacher_id: string;
-  class_id: string;
-  subject_id: string;
+  activity_type: ActivityType | string | null;
+  class_id: string | null;
+  subject_id: string | null;
   room_id: string | null;
   notes: string | null;
   time_slot: { weekday: number; period_index: number | null; shift: string | null } | null;
@@ -70,7 +73,10 @@ function isoToShort(iso: string) {
   return d.toLocaleString();
 }
 
-async function apiJson<T>(url: string, init?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+async function apiJson<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {
     const res = await fetch(url, {
       ...init,
@@ -85,6 +91,11 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<{ ok: true; 
   } catch (e: any) {
     return { ok: false, error: e?.message || "Erro de rede" };
   }
+}
+
+function normActivityType(v: any): ActivityType {
+  const t = String(v || "AULA").trim().toUpperCase();
+  return t === "HA" ? "HA" : "AULA";
 }
 
 export function WeeklyGradeBoard(props: {
@@ -141,11 +152,12 @@ export function WeeklyGradeBoard(props: {
     return arr;
   }, [classes]);
 
-  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s.name ?? ""])) , [subjects]);
-  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r.name ?? ""])) , [rooms]);
+  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s.name ?? ""])), [subjects]);
 
   async function refresh() {
-    const r = await apiJson<{ schedules: ScheduleRow[]; events: AuditEvent[] }>(`/api/weekly-grade/state?shift=${encodeURIComponent(shift)}`);
+    const r = await apiJson<{ schedules: ScheduleRow[]; events: AuditEvent[] }>(
+      `/api/weekly-grade/state?shift=${encodeURIComponent(shift)}`,
+    );
     if (!r.ok) {
       setBanner({ kind: "error", text: r.error });
       return;
@@ -153,11 +165,6 @@ export function WeeklyGradeBoard(props: {
     setSchedules(r.data.schedules ?? []);
     setEvents(r.data.events ?? []);
   }
-
-  useEffect(() => {
-    // If server-rendered data gets stale after edits, the user can still refresh manually.
-    // We keep this empty on purpose.
-  }, []);
 
   function goShift(newShift: string) {
     const params = new URLSearchParams(window.location.search);
@@ -197,7 +204,7 @@ export function WeeklyGradeBoard(props: {
 
     const already = scheduleFor(targetTeacherId, weekday, period);
     if (already) {
-      setBanner({ kind: "error", text: "Destino já ocupado. Remova ou mova a aula existente primeiro." });
+      setBanner({ kind: "error", text: "Destino já ocupado. Remova ou mova o item existente primeiro." });
       return;
     }
 
@@ -205,6 +212,7 @@ export function WeeklyGradeBoard(props: {
       method: "POST",
       body: JSON.stringify({ scheduleId, targetTimeSlotId: targetSlot.id, targetTeacherId, shift }),
     });
+
     if (!r.ok) {
       setBanner({ kind: "error", text: r.error });
       return;
@@ -222,8 +230,9 @@ export function WeeklyGradeBoard(props: {
     scheduleId?: string;
     teacherId: string;
     timeSlotId: string;
-    classId: string;
-    subjectId: string;
+    activityType: ActivityType;
+    classId?: string;
+    subjectId?: string;
     roomId: string | null;
     notes: string | null;
   }) {
@@ -231,6 +240,7 @@ export function WeeklyGradeBoard(props: {
       method: "POST",
       body: JSON.stringify({ ...values, shift }),
     });
+
     if (!r.ok) {
       setBanner({ kind: "error", text: r.error });
       return;
@@ -290,16 +300,17 @@ export function WeeklyGradeBoard(props: {
     const teacher = teachers.find((t) => t.id === teacherId) || null;
     const slot = timeSlots.find((t) => t.id === timeSlotId) || null;
     const schedule = schedules.find((s) => s.teacher_id === teacherId && s.time_slot_id === timeSlotId) || null;
-    const defSubject = schedule?.subject_id || teacher?.subject_id || "";
-    const defRoom = schedule?.room_id ?? teacher?.default_room_id ?? "";
+
+    const act = normActivityType(schedule?.activity_type);
     return {
       teacher,
       slot,
       schedule,
       defaults: {
-        classId: schedule?.class_id || "",
-        subjectId: defSubject,
-        roomId: defRoom,
+        activityType: act as ActivityType,
+        classId: act === "AULA" ? (schedule?.class_id || "") : "",
+        subjectId: act === "AULA" ? (schedule?.subject_id || teacher?.subject_id || "") : "",
+        roomId: act === "AULA" ? (schedule?.room_id ?? teacher?.default_room_id ?? "") : "",
         notes: schedule?.notes || "",
       },
     };
@@ -357,7 +368,10 @@ export function WeeklyGradeBoard(props: {
                     Professor
                   </th>
                   {WEEKDAYS.map((d) => (
-                    <th key={d.key} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    <th
+                      key={d.key}
+                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                    >
                       {d.label}
                     </th>
                   ))}
@@ -381,6 +395,8 @@ export function WeeklyGradeBoard(props: {
                             const s = scheduleFor(t.id, d.key, p);
                             const empty = !s;
                             const canDrop = Boolean(ts?.id);
+                            const act = normActivityType(s?.activity_type);
+
                             return (
                               <div
                                 key={p}
@@ -411,20 +427,32 @@ export function WeeklyGradeBoard(props: {
                                         {p}º {ts?.starts_at && ts?.ends_at ? `${ts.starts_at}–${ts.ends_at}` : ""}
                                       </span>
                                       <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                                        {empty ? "vazio" : ""}
+                                        {empty ? "vazio" : act === "HA" ? "HA" : ""}
                                       </span>
                                     </div>
+
                                     {s ? (
-                                      <div className="mt-1 grid gap-1">
-                                        <div className="text-xs font-semibold">
-                                          {s.class?.name || "Turma"}
-                                          {s.subject?.name ? ` — ${s.subject.name}` : ""}
+                                      act === "HA" ? (
+                                        <div className="mt-1 grid gap-1">
+                                          <div className="text-xs font-semibold">Hora Atividade</div>
+                                          {s.notes ? (
+                                            <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{s.notes}</div>
+                                          ) : (
+                                            <div className="text-[11px] text-zinc-500 dark:text-zinc-400">(sem observações)</div>
+                                          )}
                                         </div>
-                                        <div className="text-[11px] text-zinc-600 dark:text-zinc-300">
-                                          {s.room?.name ? `Sala ${s.room.name}` : ""}
-                                          {s.notes ? (s.room?.name ? ` · ${s.notes}` : s.notes) : ""}
+                                      ) : (
+                                        <div className="mt-1 grid gap-1">
+                                          <div className="text-xs font-semibold">
+                                            {s.class?.name || "Turma"}
+                                            {s.subject?.name ? ` — ${s.subject.name}` : ""}
+                                          </div>
+                                          <div className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                                            {s.room?.name ? `Sala ${s.room.name}` : ""}
+                                            {s.notes ? (s.room?.name ? ` · ${s.notes}` : s.notes) : ""}
+                                          </div>
                                         </div>
-                                      </div>
+                                      )
                                     ) : (
                                       <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Clique para adicionar</div>
                                     )}
@@ -434,7 +462,10 @@ export function WeeklyGradeBoard(props: {
                                     <div
                                       draggable
                                       onDragStart={(e) => {
-                                        e.dataTransfer.setData("application/json", JSON.stringify({ scheduleId: s.id }));
+                                        e.dataTransfer.setData(
+                                          "application/json",
+                                          JSON.stringify({ scheduleId: s.id }),
+                                        );
                                         e.dataTransfer.effectAllowed = "move";
                                       }}
                                       title="Arrastar"
@@ -520,8 +551,6 @@ export function WeeklyGradeBoard(props: {
           slot={editorModel.slot}
           schedule={editorModel.schedule}
           classOptions={classOptions}
-          subjectById={subjectById}
-          roomById={roomById}
           subjects={subjects}
           rooms={rooms}
           defaults={editorModel.defaults}
@@ -542,27 +571,39 @@ function EditorModal(props: {
   classOptions: RefRow[];
   subjects: RefRow[];
   rooms: RefRow[];
-  subjectById: Map<string, string>;
-  roomById: Map<string, string>;
-  defaults: { classId: string; subjectId: string; roomId: string; notes: string };
+  defaults: { activityType: ActivityType; classId: string; subjectId: string; roomId: string; notes: string };
   onClose: () => void;
-  onSave: (args: { scheduleId?: string; teacherId: string; timeSlotId: string; classId: string; subjectId: string; roomId: string | null; notes: string | null }) => void;
+  onSave: (args: {
+    scheduleId?: string;
+    teacherId: string;
+    timeSlotId: string;
+    activityType: ActivityType;
+    classId?: string;
+    subjectId?: string;
+    roomId: string | null;
+    notes: string | null;
+  }) => void;
   onDelete: (scheduleId: string) => void;
 }) {
   const { open, teacher, slot, schedule, classOptions, subjects, rooms, defaults, onClose, onSave, onDelete } = props;
+
+  const [activityType, setActivityType] = useState<ActivityType>(defaults.activityType);
   const [classId, setClassId] = useState(defaults.classId);
   const [subjectId, setSubjectId] = useState(defaults.subjectId);
   const [roomId, setRoomId] = useState(defaults.roomId);
   const [notes, setNotes] = useState(defaults.notes);
 
   useEffect(() => {
+    setActivityType(defaults.activityType);
     setClassId(defaults.classId);
     setSubjectId(defaults.subjectId);
     setRoomId(defaults.roomId);
     setNotes(defaults.notes);
-  }, [defaults.classId, defaults.subjectId, defaults.roomId, defaults.notes, open]);
+  }, [defaults.activityType, defaults.classId, defaults.subjectId, defaults.roomId, defaults.notes, open]);
 
   if (!open) return null;
+
+  const isHa = activityType === "HA";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
@@ -585,11 +626,37 @@ function EditorModal(props: {
 
         <div className="mt-4 grid gap-4">
           <label className="grid gap-2">
+            <span className="text-sm font-semibold">Tipo</span>
+            <select
+              value={activityType}
+              onChange={(e) => {
+                const t = normActivityType(e.target.value);
+                setActivityType(t);
+                if (t === "HA") {
+                  setClassId("");
+                  setSubjectId("");
+                  setRoomId("");
+                }
+              }}
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+            >
+              <option value="AULA">Aula</option>
+              <option value="HA">Hora Atividade (HA)</option>
+            </select>
+          </label>
+
+          <label className="grid gap-2">
             <span className="text-sm font-semibold">Turma</span>
             <select
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
-              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+              disabled={isHa}
+              className={
+                "h-10 rounded-xl border px-3 text-sm outline-none transition focus:border-zinc-400 dark:focus:border-zinc-600 " +
+                (isHa
+                  ? "border-zinc-100 bg-zinc-100 text-zinc-500 dark:border-zinc-900 dark:bg-zinc-900 dark:text-zinc-400"
+                  : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950")
+              }
             >
               <option value="">Selecione...</option>
               {classOptions.map((c) => (
@@ -598,6 +665,9 @@ function EditorModal(props: {
                 </option>
               ))}
             </select>
+            {isHa ? (
+              <span className="text-xs text-zinc-500">HA não utiliza turma/disciplina.</span>
+            ) : null}
           </label>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -606,7 +676,13 @@ function EditorModal(props: {
               <select
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value)}
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                disabled={isHa}
+                className={
+                  "h-10 rounded-xl border px-3 text-sm outline-none transition focus:border-zinc-400 dark:focus:border-zinc-600 " +
+                  (isHa
+                    ? "border-zinc-100 bg-zinc-100 text-zinc-500 dark:border-zinc-900 dark:bg-zinc-900 dark:text-zinc-400"
+                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950")
+                }
               >
                 <option value="">—</option>
                 {subjects.map((s) => (
@@ -622,7 +698,13 @@ function EditorModal(props: {
               <select
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                disabled={isHa}
+                className={
+                  "h-10 rounded-xl border px-3 text-sm outline-none transition focus:border-zinc-400 dark:focus:border-zinc-600 " +
+                  (isHa
+                    ? "border-zinc-100 bg-zinc-100 text-zinc-500 dark:border-zinc-900 dark:bg-zinc-900 dark:text-zinc-400"
+                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950")
+                }
               >
                 <option value="">—</option>
                 {rooms.map((r) => (
@@ -648,14 +730,18 @@ function EditorModal(props: {
             <button
               type="button"
               onClick={() => {
-                if (!classId) return;
+                if (activityType === "AULA") {
+                  if (!classId) return;
+                  if (!subjectId) return;
+                }
                 onSave({
                   scheduleId: schedule?.id,
                   teacherId: teacher.id,
                   timeSlotId: slot.id,
-                  classId,
-                  subjectId,
-                  roomId: roomId ? roomId : null,
+                  activityType,
+                  classId: activityType === "AULA" ? classId : undefined,
+                  subjectId: activityType === "AULA" ? subjectId : undefined,
+                  roomId: activityType === "AULA" && roomId ? roomId : null,
                   notes: notes ? notes : null,
                 });
               }}
@@ -668,7 +754,7 @@ function EditorModal(props: {
               <button
                 type="button"
                 onClick={() => {
-                  if (confirm("Excluir esta aula?")) onDelete(schedule.id);
+                  if (confirm("Excluir este item da grade?")) onDelete(schedule.id);
                 }}
                 className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
@@ -676,6 +762,10 @@ function EditorModal(props: {
               </button>
             ) : null}
           </div>
+
+          {activityType === "AULA" && (!classId || !subjectId) ? (
+            <div className="text-xs text-zinc-500">Para salvar Aula, selecione Turma e Disciplina.</div>
+          ) : null}
         </div>
       </div>
     </div>

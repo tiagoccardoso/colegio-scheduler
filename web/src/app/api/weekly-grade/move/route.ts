@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { validateNoConflicts } from "@/lib/schedule/validate";
-import { getState, jsonError, normalizeShift, requireDirectorApi, scheduleSnapshot, validateTeacherForSlot } from "../_utils";
+import {
+  getState,
+  jsonError,
+  normalizeShift,
+  requireDirectorApi,
+  scheduleSnapshot,
+  validateTeacherForHaSlot,
+  validateTeacherForSlot,
+} from "../_utils";
 
 export async function POST(req: Request) {
   const ctx = await requireDirectorApi();
@@ -24,11 +32,13 @@ export async function POST(req: Request) {
 
   const { data: current } = await supabase
     .from("schedules")
-    .select("id,school_id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
     .eq("id", scheduleId)
     .eq("school_id", profile.school_id)
     .maybeSingle();
-  if (!current) return jsonError("Aula não encontrada.");
+  if (!current) return jsonError("Item não encontrado.");
+
+  const activityType = String((current as any)?.activity_type || "AULA").trim().toUpperCase() === "HA" ? "HA" : "AULA";
 
   const { data: slot } = await supabase
     .from("time_slots")
@@ -41,13 +51,17 @@ export async function POST(req: Request) {
     return jsonError("Turno do slot diferente do filtro atual.");
   }
 
-  const { data: cls } = await supabase
-    .from("classes")
-    .select("id,shift")
-    .eq("id", current.class_id)
-    .eq("school_id", profile.school_id)
-    .maybeSingle();
-  if (!cls) return jsonError("Turma não encontrada.");
+  let cls: any = null;
+  if (activityType === "AULA") {
+    const { data } = await supabase
+      .from("classes")
+      .select("id,shift")
+      .eq("id", current.class_id)
+      .eq("school_id", profile.school_id)
+      .maybeSingle();
+    cls = data;
+    if (!cls) return jsonError("Turma não encontrada.");
+  }
 
   const { data: teacher } = await supabase
     .from("teachers")
@@ -67,15 +81,26 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (occupied?.data) return jsonError("Destino já ocupado.");
 
-  const ruleError = validateTeacherForSlot({ teacher, cls, slot, subject_id: current.subject_id, room_id: current.room_id ?? null });
-  if (ruleError) return jsonError(ruleError);
+  if (activityType === "AULA") {
+    const ruleError = validateTeacherForSlot({
+      teacher,
+      cls,
+      slot,
+      subject_id: current.subject_id,
+      room_id: current.room_id ?? null,
+    });
+    if (ruleError) return jsonError(ruleError);
+  } else {
+    const ruleError = validateTeacherForHaSlot({ teacher, slot });
+    if (ruleError) return jsonError(ruleError);
+  }
 
   const conflict = await validateNoConflicts({
     supabase,
-    class_id: current.class_id,
+    class_id: activityType === "AULA" ? current.class_id : "",
     time_slot_id: targetTimeSlotId,
     teacher_id: targetTeacherId,
-    room_id: current.room_id ?? null,
+    room_id: activityType === "AULA" ? (current.room_id ?? null) : null,
     schedule_id: scheduleId,
   });
   if (conflict) return jsonError(conflict.message);
@@ -87,7 +112,7 @@ export async function POST(req: Request) {
     .update({ teacher_id: targetTeacherId, time_slot_id: targetTimeSlotId })
     .eq("id", scheduleId)
     .eq("school_id", profile.school_id)
-    .select("id,school_id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
     .maybeSingle();
 
   if (error) return jsonError(error.message || "Falha ao mover.");

@@ -42,7 +42,7 @@ export async function getState(args: { supabase: any; schoolId: string; shift: s
     const { data: sched } = await supabase
       .from("schedules")
       .select(
-        "id,time_slot_id,teacher_id,class_id,subject_id,room_id,notes,time_slot:time_slots(weekday,period_index,shift),class:classes(name,shift),subject:subjects(name),room:rooms(name)",
+        "id,time_slot_id,teacher_id,activity_type,class_id,subject_id,room_id,notes,time_slot:time_slots(weekday,period_index,shift),class:classes(name,shift),subject:subjects(name),room:rooms(name)",
       )
       .eq("school_id", schoolId)
       .in("time_slot_id", timeSlotIds);
@@ -110,7 +110,7 @@ export function validateTeacherForSlot(args: {
   if (primarySubject && subject_id && primarySubject !== subject_id) {
     return "Disciplina não compatível com este professor.";
   }
-  if (!primarySubject && legacySubjects.length && !legacySubjects.includes(subject_id)) {
+  if (!primarySubject && legacySubjects.length && subject_id && !legacySubjects.includes(subject_id)) {
     return "Professor não está habilitado para esta disciplina.";
   }
 
@@ -122,14 +122,44 @@ export function validateTeacherForSlot(args: {
   return null;
 }
 
+// Regras mínimas para Hora Atividade (HA):
+// - professor atende o turno do slot
+// - professor disponível no dia/período
+export function validateTeacherForHaSlot(args: { teacher: any; slot: any }) {
+  const { teacher, slot } = args;
+
+  const slotShift = String(slot?.shift ?? "");
+  const teacherShifts = (((teacher?.shifts ?? []) as string[]) || []).map(String).filter(Boolean);
+  if (teacherShifts.length && slotShift && !teacherShifts.includes(slotShift)) {
+    return "Professor não atende este turno.";
+  }
+
+  const availability = teacher?.availability as any;
+  const weekday = Number(slot?.weekday);
+  const periodIndex = Number(slot?.period_index);
+
+  if (availability && typeof availability === "object" && slotShift && Number.isFinite(weekday) && Number.isFinite(periodIndex)) {
+    const allowed = availability?.[String(slotShift)]?.[String(weekday)];
+    if (!Array.isArray(allowed) || allowed.length === 0 || !allowed.includes(periodIndex)) {
+      return "Professor indisponível neste dia/período.";
+    }
+  } else {
+    const days = ((teacher?.available_weekdays ?? []) as number[]).filter((n) => Number.isFinite(n));
+    if (days.length && !days.includes(weekday)) return "Professor indisponível neste dia da semana.";
+  }
+
+  return null;
+}
+
 export function scheduleSnapshot(s: any) {
   if (!s) return null;
   return {
     id: s.id,
     school_id: s.school_id,
-    class_id: s.class_id,
+    activity_type: s.activity_type ?? "AULA",
+    class_id: s.class_id ?? null,
     time_slot_id: s.time_slot_id,
-    subject_id: s.subject_id,
+    subject_id: s.subject_id ?? null,
     teacher_id: s.teacher_id,
     room_id: s.room_id ?? null,
     notes: s.notes ?? null,

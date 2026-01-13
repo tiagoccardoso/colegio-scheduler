@@ -20,11 +20,11 @@ export async function POST(req: Request) {
 
   const { data: current } = await supabase
     .from("schedules")
-    .select("id,school_id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
     .eq("id", scheduleId)
     .eq("school_id", profile.school_id)
     .maybeSingle();
-  if (!current) return jsonError("Aula não encontrada.");
+  if (!current) return jsonError("Item não encontrado.");
 
   const before = scheduleSnapshot(current);
 
