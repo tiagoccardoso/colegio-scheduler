@@ -69,7 +69,7 @@ function timeSlotLabel(ts: TimeSlotRow) {
 export default async function Page({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { supabase, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};

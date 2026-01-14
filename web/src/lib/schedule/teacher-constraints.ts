@@ -1,6 +1,23 @@
 import { availabilityHasPeriod, effectiveRoomId, normalizeShift, normalizeShiftOrNull, teacherAcceptsShift } from "@/lib/schedule/rules";
-import type { TeachingRule } from "@/lib/schedule/teaching-rules";
 import { parseTeachingRulesJson } from "@/lib/schedule/teaching-rules";
+
+export type TeachingRuleCompat = {
+  subject_id: string;
+  /** Sala (opcional). null/undefined = qualquer sala */
+  room_id?: string | null;
+  /** Turma (opcional). null/undefined = qualquer turma */
+  class_id?: string | null;
+  /** Turno */
+  shift: string;
+  /** Período (1..6; Noite costuma ser 1..5) */
+  period_index: number;
+  /** Dias da semana (1=Seg .. 7=Dom). Se vazio/ausente, assume Seg–Sex. */
+  weekdays?: number[] | null;
+  /** Compat futuro */
+  period_from?: number;
+  /** Compat futuro */
+  period_to?: number;
+};
 
 const DEFAULT_WEEKDAYS = [1, 2, 3, 4, 5];
 
@@ -17,9 +34,9 @@ function toStr(v: any) {
  * - array (jsonb no Supabase)
  * - string JSON (hidden input)
  */
-export function getTeachingRules(raw: any): TeachingRule[] {
+export function getTeachingRules(raw: any): TeachingRuleCompat[] {
   if (Array.isArray(raw)) {
-    const out: TeachingRule[] = [];
+    const out: TeachingRuleCompat[] = [];
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
       const subject_id = toStr((item as any).subject_id);

@@ -52,9 +52,11 @@ export async function POST(req: Request) {
 
     // Preferir não apagar HA. Como bases antigas podem não ter activity_type,
     // tentamos primeiro com activity_type e, se falhar, apagamos apenas registros com class_id (aulas).
+    // `delete()` pode ser tipado como `never` (e não retorna linhas por padrão).
+    // Pedimos o `count` para obter quantos registros foram removidos sem depender de `data`.
     const attempt = await supabase
       .from("schedules")
-      .delete()
+      .delete({ count: "exact" })
       .eq("school_id", schoolId)
       .in("time_slot_id", timeSlotIds)
       .not("class_id", "is", null)
@@ -64,18 +66,18 @@ export async function POST(req: Request) {
       // Fallback: DB sem activity_type
       const fallback = await supabase
         .from("schedules")
-        .delete()
+        .delete({ count: "exact" })
         .eq("school_id", schoolId)
         .in("time_slot_id", timeSlotIds)
         .not("class_id", "is", null);
       if (fallback.error) {
         return NextResponse.json({ error: fallback.error.message || "Falha ao excluir." }, { status: 400 });
       }
-      const deleted = Array.isArray(fallback.data) ? fallback.data.length : 0;
+      const deleted = fallback.count ?? 0;
       return NextResponse.json({ ok: true, shift, deleted });
     }
 
-    const deleted = Array.isArray(attempt.data) ? attempt.data.length : 0;
+    const deleted = attempt.count ?? 0;
     return NextResponse.json({ ok: true, shift, deleted });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Erro inesperado." }, { status: 500 });
