@@ -22,6 +22,14 @@ type TeachingRule = {
   weekdays?: number[] | null;
 };
 
+const WEEKDAY_LABEL: Record<number, string> = {
+  1: "Seg",
+  2: "Ter",
+  3: "Qua",
+  4: "Qui",
+  5: "Sex",
+};
+
 const DEFAULT_WEEKDAYS = [1, 2, 3, 4, 5];
 
 function normalizeShift(v: any) {
@@ -90,7 +98,7 @@ export async function POST(req: Request) {
     // Time slots do turno
     const { data: timeSlots } = await supabase
       .from("time_slots")
-      .select("id,weekday,shift,period_index")
+      .select("id,weekday,shift,period_index,starts_at,ends_at")
       .eq("school_id", schoolId)
       .eq("shift", requestedShift)
       .in("weekday", [1, 2, 3, 4, 5]);
@@ -105,8 +113,10 @@ export async function POST(req: Request) {
 
     const slotIds = slots.map((s) => String(s.id));
     const slotKeyToId = new Map<string, string>();
+    const slotById = new Map<string, any>();
     for (const s of slots) {
       slotKeyToId.set(`${Number(s.weekday)}-${Number(s.period_index)}`, String(s.id));
+      slotById.set(String(s.id), s);
     }
 
     // Detecta se existe coluna activity_type (bases antigas podem não ter)
@@ -231,6 +241,24 @@ export async function POST(req: Request) {
     let skipped = 0;
     const warnings: string[] = [];
 
+    const conflictCounts = { teacher: 0, room: 0, class: 0 };
+    const conflictPreview: string[] = [];
+
+    function pushPreview(msg: string) {
+      if (conflictPreview.length >= 10) return;
+      if (!msg) return;
+      conflictPreview.push(msg);
+    }
+
+    function slotLabel(slotId: string) {
+      const ts = slotById.get(slotId);
+      if (!ts) return "(horário)";
+      const w = WEEKDAY_LABEL?.[Number(ts.weekday) ?? 0] ?? "Dia";
+      const p = Number(ts.period_index ?? 0);
+      const range = ts.starts_at ? `${ts.starts_at}–${ts.ends_at}` : p ? `${p}º` : "";
+      return `${w} ${range}`.trim();
+    }
+
     // Dedup para evitar regras duplicadas no mesmo professor
     const plannedKeys = new Set<string>();
 
@@ -261,14 +289,20 @@ export async function POST(req: Request) {
 
           // Conflitos em memória
           if (busyTeacher.get(slotId)?.has(teacherId)) {
+            conflictCounts.teacher += 1;
+            pushPreview(`Professor ocupado: ${String(t.name ?? "(sem nome)")} em ${slotLabel(slotId)}.`);
             skipped += 1;
             continue;
           }
           if (busyRoom.get(slotId)?.has(String(r.room_id))) {
+            conflictCounts.room += 1;
+            pushPreview(`Sala ocupada em ${slotLabel(slotId)}.`);
             skipped += 1;
             continue;
           }
           if (busyClass.get(slotId)?.has(String(r.class_id))) {
+            conflictCounts.class += 1;
+            pushPreview(`Turma já tem aula em ${slotLabel(slotId)}.`);
             skipped += 1;
             continue;
           }
@@ -282,6 +316,10 @@ export async function POST(req: Request) {
             room_id: String(r.room_id) || null,
           });
           if (conflict) {
+            if (conflict.kind === "teacher") conflictCounts.teacher += 1;
+            if (conflict.kind === "room") conflictCounts.room += 1;
+            if (conflict.kind === "class") conflictCounts.class += 1;
+            pushPreview(conflict.message);
             skipped += 1;
             continue;
           }
@@ -322,12 +360,26 @@ export async function POST(req: Request) {
       );
     }
 
+    const totalConflicts = conflictCounts.teacher + conflictCounts.room + conflictCounts.class;
+    if (totalConflicts > 0) {
+      warnings.push(
+        `Conflitos detectados na montagem: Professores (${conflictCounts.teacher}), Turmas (${conflictCounts.class}), Salas (${conflictCounts.room}). Veja em Montar grade → Ver conflitos.`,
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       shift: requestedShift,
       overwrite,
       applied,
       skipped,
+      conflicts: {
+        total: totalConflicts,
+        teacher: conflictCounts.teacher,
+        room: conflictCounts.room,
+        class: conflictCounts.class,
+        preview: conflictPreview,
+      },
       warnings,
       summary: `Grade montada pelo cadastro dos professores (regras por horário). Aplicadas: ${applied}. Ignoradas: ${skipped}.`,
     });

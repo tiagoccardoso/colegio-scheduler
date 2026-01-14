@@ -48,6 +48,9 @@ export default async function Page({
   const { supabase, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};
 
+  // Usado por telas auxiliares (ex.: Conflitos) para abrir direto o professor.
+  const focusId = typeof (sp as any)?.focus === "string" ? String((sp as any).focus) : null;
+
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
@@ -273,7 +276,11 @@ export default async function Page({
                     : labelList(row.room_ids, roomById, "Todas");
 
                   return (
-                    <tr key={row.id} className="border-t border-zinc-100 dark:border-zinc-900">
+                    <tr
+                      key={row.id}
+                      id={`teacher-${row.id}`}
+                      className="border-t border-zinc-100 dark:border-zinc-900"
+                    >
                       <td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{row.name ?? ""}</td>
                       <td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{row.email ?? ""}</td>
                       <td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{labelShiftList(row.shifts)}</td>
@@ -282,7 +289,7 @@ export default async function Page({
                       <td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{roomsLabel}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <details>
+                          <details open={Boolean(focusId && focusId === row.id)}>
                             <summary className="cursor-pointer text-sm font-semibold">Editar</summary>
                             <form action={updateAction} className="mt-3 grid w-[860px] max-w-[calc(100vw-3rem)] gap-4">
                               <input type="hidden" name="id" value={row.id} />

@@ -27,6 +27,13 @@ type BuildResp = {
   overwrite: boolean;
   applied: number;
   skipped: number;
+  conflicts?: {
+    total: number;
+    teacher: number;
+    room: number;
+    class: number;
+    preview?: string[];
+  };
   warnings?: string[];
   summary?: string;
   skippedAll?: boolean;
@@ -50,6 +57,7 @@ type GeneralResp = {
     activity_type: "AULA" | "HA" | string;
     className: string | null;
     subjectName: string | null;
+    roomName?: string | null;
     notes: string | null;
   }[];
 };
@@ -76,6 +84,7 @@ export function ScheduleGeneralClient(props: {
   const [building, setBuilding] = useState(false);
   const [buildInfo, setBuildInfo] = useState<string | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
+  const [buildConflicts, setBuildConflicts] = useState<BuildResp["conflicts"] | null>(null);
 
   const [data, setData] = useState<GradeByClassResp | null>(null);
   const [ha, setHa] = useState<HaResp | null>(null);
@@ -108,6 +117,7 @@ export function ScheduleGeneralClient(props: {
     setBuilding(true);
     setBuildError(null);
     setBuildInfo(null);
+    setBuildConflicts(null);
     try {
       const res = await fetch("/api/ai/build-global-schedule", {
         method: "POST",
@@ -119,6 +129,7 @@ export function ScheduleGeneralClient(props: {
         setBuildError((json as any)?.error || "Falha ao montar a grade.");
       } else {
         setBuildInfo(json?.summary || `Grade montada. Aplicadas: ${json.applied}. Ignoradas: ${json.skipped}.`);
+        if (json?.conflicts && Number(json.conflicts.total ?? 0) > 0) setBuildConflicts(json.conflicts);
       }
       return json;
     } catch (e: any) {
@@ -350,6 +361,33 @@ export function ScheduleGeneralClient(props: {
               {buildInfo}
             </div>
           ) : null}
+
+          {buildConflicts && buildConflicts.total > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="grid gap-1">
+                  <div className="font-semibold">Conflitos de horário detectados durante a montagem</div>
+                  <div className="text-sm text-amber-800/90 dark:text-amber-200/90">
+                    Total: {buildConflicts.total} • Professores: {buildConflicts.teacher} • Turmas: {buildConflicts.class} • Salas: {buildConflicts.room}
+                  </div>
+                  {Array.isArray(buildConflicts.preview) && buildConflicts.preview.length ? (
+                    <ul className="mt-1 list-disc pl-5 text-sm">
+                      {buildConflicts.preview.slice(0, 5).map((m, idx) => (
+                        <li key={idx}>{m}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
+                <a
+                  href={`/schedule/conflicts?shift=${encodeURIComponent(shift)}`}
+                  className="h-9 rounded-xl bg-amber-900 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-800 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
+                >
+                  Ver conflitos
+                </a>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -457,10 +495,10 @@ export function ScheduleGeneralClient(props: {
                             {cell ? (
                               <div className="leading-tight">
                                 <div className="font-semibold">{cell.subject}</div>
-                                <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.teacher}</div>
-                                {cell.room ? (
-                                  <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.room}</div>
-                                ) : null}
+                                <div className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                                  {cell.teacher}
+                                  {cell.room ? ` • ${cell.room}` : ""}
+                                </div>
                               </div>
                             ) : null}
                           </td>

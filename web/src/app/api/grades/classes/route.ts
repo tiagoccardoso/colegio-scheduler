@@ -82,11 +82,12 @@ export async function GET(req: Request) {
     const classIds = new Set<string>(classes.map((c: any) => String(c.id)));
 
     const cols = classes.map((cls: any) => {
-      const room = roomsById.get(cls.default_room_id);
+      // A grade geral pode mudar de sala por período (de acordo com a regra do professor).
+      // Por isso, o cabeçalho deve identificar a coluna como TURMA (e a sala aparece dentro da célula).
       return {
         id: cls.id,
         header: {
-          sala: roomLabel(room),
+          sala: "TURMA",
           levelStage: [cls.level, cls.stage].filter(Boolean).join(" "),
           turma: cls.name ?? "Turma",
         },
