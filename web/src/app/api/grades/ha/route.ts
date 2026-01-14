@@ -25,17 +25,20 @@ export async function GET(req: Request) {
 
     const schoolId = profile.school_id;
 
-    const { data: timeSlotsRaw } = await supabase
-      .from("time_slots")
-      .select("id,weekday,starts_at,ends_at,shift,period_index")
-      .eq("school_id", schoolId)
-      .eq("shift", shift)
-      .in("weekday", [1, 2, 3, 4, 5])
-      .order("weekday", { ascending: true })
-      .order("period_index", { ascending: true });
+    const [{ data: timeSlotsRaw }, { data: school }] = await Promise.all([
+      supabase
+        .from("time_slots")
+        .select("id,weekday,starts_at,ends_at,shift,period_index")
+        .eq("school_id", schoolId)
+        .eq("shift", shift)
+        .in("weekday", [1, 2, 3, 4, 5])
+        .order("weekday", { ascending: true })
+        .order("period_index", { ascending: true }),
+      supabase.from("schools").select("id,name,term_label").eq("id", schoolId).maybeSingle(),
+    ]);
 
     // Em alguns bancos antigos, teachers pode não ter short_name/display_order.
-    // Se a consulta falhar, caímos para um select mínimo (id,name), evitando voltar "Professor" por falta de dados.
+    // Se a consulta falhar, caímos para um select mínimo (id,name).
     let teachersRaw: any[] = [];
     const teachersTry = await supabase
       .from("teachers")
@@ -72,14 +75,19 @@ export async function GET(req: Request) {
         // DB sem activity_type
         haRows = [];
       } else {
-        haRows = ((data as any[]) ?? []).filter((r) => String(r?.activity_type ?? "").toUpperCase() === "HA");
+        haRows = ((data as any[]) ?? []).filter(
+          (r) => String(r?.activity_type ?? "").toUpperCase() === "HA",
+        );
       }
     }
 
     const teachers = teachersRaw;
-    const teacherById = new Map<string, any>(teachers.map((t) => [t.id, t]));
 
-    const byTeacher: Record<string, { weekday: number; period_index: number | null; timeSlotId: string; notes: string | null }[]> = {};
+    const byTeacher: Record<
+      string,
+      { weekday: number; period_index: number | null; timeSlotId: string; notes: string | null }[]
+    > = {};
+
     for (const r of haRows) {
       const tid = String(r.teacher_id ?? "");
       const tsid = String(r.time_slot_id ?? "");
@@ -95,19 +103,38 @@ export async function GET(req: Request) {
       });
     }
 
-    const items = Object.entries(byTeacher)
-      .map(([teacherId, slots]) => {
-        const t = teacherById.get(teacherId);
-        slots.sort((a, b) => (a.weekday - b.weekday) || (Number(a.period_index ?? 0) - Number(b.period_index ?? 0)));
+    const items = teachers
+      .map((t) => {
+        const slots = (byTeacher[String(t.id)] || []).slice();
+        slots.sort(
+          (a, b) =>
+            (a.weekday - b.weekday) ||
+            (Number(a.period_index ?? 0) - Number(b.period_index ?? 0)),
+        );
         return {
-          teacherId,
+          teacherId: String(t.id),
           teacherName: teacherLabel(t),
           slots,
         };
       })
       .sort((a, b) => String(a.teacherName).localeCompare(String(b.teacherName)));
 
-    return NextResponse.json({ ok: true, shift, items });
+    return NextResponse.json({
+      ok: true,
+      shift,
+      school: {
+        name: (school as any)?.name ?? null,
+        term_label: (school as any)?.term_label ?? null,
+      },
+      timeSlots: timeSlots.map((t) => ({
+        id: t.id,
+        weekday: t.weekday,
+        period_index: t.period_index,
+        starts_at: t.starts_at ?? null,
+        ends_at: t.ends_at ?? null,
+      })),
+      items,
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Erro inesperado." }, { status: 500 });
   }

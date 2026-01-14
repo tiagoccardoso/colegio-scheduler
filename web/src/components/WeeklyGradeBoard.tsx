@@ -318,7 +318,7 @@ export function WeeklyGradeBoard(props: {
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
         <label className="grid gap-2">
           <span className="text-sm font-semibold">Turno</span>
           <select
@@ -342,13 +342,28 @@ export function WeeklyGradeBoard(props: {
           >
             Atualizar
           </button>
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          >
+            Imprimir
+          </button>
+        </div>
+      </div>
+
+      <div className="hidden print:block">
+        <div className="text-lg font-semibold">Grade semanal</div>
+        <div className="text-sm text-zinc-600">
+          Turno: {shiftOptions.find((s) => s.key === shift)?.label || shift} • Gerado em: {new Date().toLocaleString()}
         </div>
       </div>
 
       {banner ? (
         <div
           className={
-            "rounded-xl border px-4 py-3 text-sm " +
+            "print:hidden rounded-xl border px-4 py-3 text-sm " +
             (banner.kind === "error"
               ? "border-red-200 bg-red-50 text-red-800 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
               : "border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200")
@@ -469,7 +484,7 @@ export function WeeklyGradeBoard(props: {
                                         e.dataTransfer.effectAllowed = "move";
                                       }}
                                       title="Arrastar"
-                                      className="cursor-grab select-none rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 active:cursor-grabbing dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                                      className="print:hidden cursor-grab select-none rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 active:cursor-grabbing dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
                                     >
                                       ⠿
                                     </div>
@@ -496,7 +511,7 @@ export function WeeklyGradeBoard(props: {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:hidden">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Histórico</h2>
           </div>
@@ -559,6 +574,15 @@ export function WeeklyGradeBoard(props: {
           onDelete={(sid) => void deleteSchedule(sid)}
         />
       ) : null}
+
+      <style jsx global>{`
+        @media print {
+          @page { size: A4 landscape; margin: 12mm; }
+          table, th, td { border: 1px solid #333 !important; }
+          .sticky { position: static !important; }
+          button, input, select, textarea { box-shadow: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -606,7 +630,7 @@ function EditorModal(props: {
   const isHa = activityType === "HA";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center print:hidden">
       <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-950">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">

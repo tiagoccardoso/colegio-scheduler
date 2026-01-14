@@ -1,8 +1,16 @@
-
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeSlots } from "@/lib/time-slots/normalize";
 import { subjectLabel, teacherLabel, roomLabel, effectiveRoomId } from "@/lib/schedule/rules";
+
+function normalizeShift(v: any) {
+  const k = String(v ?? "").trim().toUpperCase();
+  if (!k) return "";
+  if (k.startsWith("MAN")) return "MANHA";
+  if (k.startsWith("TAR")) return "TARDE";
+  if (k.startsWith("NOI")) return "NOITE";
+  return k;
+}
 
 export async function GET(req: Request) {
   try {
@@ -10,7 +18,9 @@ export async function GET(req: Request) {
     const shift = String(url.searchParams.get("shift") || "MANHA").trim().toUpperCase();
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
     const { data: profile } = await supabase
@@ -24,21 +34,20 @@ export async function GET(req: Request) {
 
     const schoolId = profile.school_id;
 
-    const [{ data: timeSlotsRaw }, { data: classesRaw }, { data: roomsRaw }, { data: subjectsRaw }, { data: teachersRaw }, { data: schedulesRaw }, { data: school }] =
+    const [{ data: timeSlotsRaw }, { data: classesRaw }, { data: roomsRaw }, { data: subjectsRaw }, { data: teachersRaw }, { data: school }] =
       await Promise.all([
         supabase
           .from("time_slots")
           .select("id,weekday,starts_at,ends_at,shift,period_index")
           .eq("school_id", schoolId)
           .eq("shift", shift)
+          .in("weekday", [1, 2, 3, 4, 5])
           .order("weekday", { ascending: true })
           .order("period_index", { ascending: true }),
         supabase.from("classes").select("*").eq("school_id", schoolId),
         supabase.from("rooms").select("*").eq("school_id", schoolId),
         supabase.from("subjects").select("*").eq("school_id", schoolId),
         supabase.from("teachers").select("*").eq("school_id", schoolId),
-        // we'll filter schedules by slot IDs
-        supabase.from("schedules").select("id,class_id,time_slot_id,subject_id,teacher_id,room_id").eq("school_id", schoolId),
         supabase.from("schools").select("id,name,term_label").eq("id", schoolId).maybeSingle(),
       ]);
 
@@ -46,28 +55,33 @@ export async function GET(req: Request) {
     const slotById = new Map<string, any>(timeSlots.map((s: any) => [s.id, s]));
     const slotIds = timeSlots.map((s: any) => s.id);
 
-    // filter schedules to these slots only (client-side, safe)
-    const schedules = ((schedulesRaw as any[]) ?? []).filter((s) => slotIds.includes(s.time_slot_id));
+    // Classes do turno (grade geral)
+    const classesAll = ((classesRaw as any[]) ?? []).slice();
+    const classes = classesAll.filter((c) => {
+      const s = normalizeShift((c as any)?.shift);
+      return !s || s === shift;
+    });
 
     const roomsById = new Map<string, any>(((roomsRaw as any[]) ?? []).map((r) => [r.id, r]));
     const subjectsById = new Map<string, any>(((subjectsRaw as any[]) ?? []).map((r) => [r.id, r]));
     const teachersById = new Map<string, any>(((teachersRaw as any[]) ?? []).map((r) => [r.id, r]));
-    const classes = ((classesRaw as any[]) ?? []).slice();
 
     // Sort classes by room number, display_order, then name
     classes.sort((a, b) => {
-      const ra = roomsById.get(a.default_room_id);
-      const rb = roomsById.get(b.default_room_id);
-      const rna = Number(ra?.room_number ?? 9999);
-      const rnb = Number(rb?.room_number ?? 9999);
+      const ra = roomsById.get((a as any).default_room_id);
+      const rb = roomsById.get((b as any).default_room_id);
+      const rna = Number((ra as any)?.room_number ?? 9999);
+      const rnb = Number((rb as any)?.room_number ?? 9999);
       if (rna !== rnb) return rna - rnb;
-      const da = Number(a.display_order ?? 9999);
-      const db = Number(b.display_order ?? 9999);
+      const da = Number((a as any).display_order ?? 9999);
+      const db = Number((b as any).display_order ?? 9999);
       if (da !== db) return da - db;
-      return String(a.name ?? "").localeCompare(String(b.name ?? ""));
+      return String((a as any).name ?? "").localeCompare(String((b as any).name ?? ""));
     });
 
-    const cols = classes.map((cls) => {
+    const classIds = new Set<string>(classes.map((c: any) => String(c.id)));
+
+    const cols = classes.map((cls: any) => {
       const room = roomsById.get(cls.default_room_id);
       return {
         id: cls.id,
@@ -79,6 +93,39 @@ export async function GET(req: Request) {
       };
     });
 
+    // Detecta coluna activity_type (para evitar trazer HA nos relatórios de grade)
+    let hasActivityType = true;
+    {
+      const probe = await supabase.from("schedules").select("activity_type").limit(1);
+      if (probe.error) hasActivityType = false;
+    }
+
+    let schedules: any[] = [];
+    if (slotIds.length) {
+      const sel = hasActivityType
+        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type"
+        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id";
+
+      const res = await supabase
+        .from("schedules")
+        .select(sel)
+        .eq("school_id", schoolId)
+        .in("time_slot_id", slotIds);
+
+      if (res.error) {
+        // fallback p/ DB legado
+        const legacy = await supabase
+          .from("schedules")
+          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id")
+          .eq("school_id", schoolId)
+          .in("time_slot_id", slotIds);
+        schedules = (legacy.data as any[]) ?? [];
+        hasActivityType = false;
+      } else {
+        schedules = (res.data as any[]) ?? [];
+      }
+    }
+
     // grid key = weekday-period_index
     const grid: Record<string, Record<string, any>> = {};
     for (const ts of timeSlots) {
@@ -87,19 +134,31 @@ export async function GET(req: Request) {
     }
 
     for (const sc of schedules) {
+      const classId = sc?.class_id ? String(sc.class_id) : "";
+      if (!classId) continue;
+      if (!classIds.has(classId)) continue;
+
+      if (hasActivityType) {
+        const act = String(sc?.activity_type ?? "").trim().toUpperCase();
+        if (act === "HA") continue;
+      }
+
       const ts = slotById.get(sc.time_slot_id);
       if (!ts) continue;
       const k = `${ts.weekday}-${ts.period_index ?? 0}`;
+
       const subj = subjectsById.get(sc.subject_id);
       const teach = teachersById.get(sc.teacher_id);
-      const cls = classes.find((c) => c.id === sc.class_id);
+      const cls = classes.find((c: any) => String(c.id) === classId);
+
       const effRoom = effectiveRoomId({
         scheduleRoomId: sc.room_id,
         classDefaultRoomId: cls?.default_room_id ?? null,
         teacherDefaultRoomId: teach?.default_room_id ?? null,
       });
+
       grid[k] ||= {};
-      grid[k][sc.class_id] = {
+      grid[k][classId] = {
         subject: subjectLabel(subj),
         teacher: teacherLabel(teach),
         room: effRoom ? roomLabel(roomsById.get(effRoom)) : null,
@@ -108,9 +167,17 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      school: { name: (school as any)?.name ?? null, term_label: (school as any)?.term_label ?? null },
+      school: {
+        name: (school as any)?.name ?? null,
+        term_label: (school as any)?.term_label ?? null,
+      },
       shift,
-      timeSlots: timeSlots.map((t) => ({ weekday: t.weekday, period_index: t.period_index, starts_at: t.starts_at, ends_at: t.ends_at })),
+      timeSlots: timeSlots.map((t) => ({
+        weekday: t.weekday,
+        period_index: t.period_index,
+        starts_at: t.starts_at,
+        ends_at: t.ends_at,
+      })),
       classes: cols,
       grid,
     });

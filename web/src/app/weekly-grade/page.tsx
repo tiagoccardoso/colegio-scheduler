@@ -50,6 +50,14 @@ const SHIFT_OPTIONS: { key: string; label: string }[] = [
   { key: "TARDE", label: "Tarde" },
   { key: "NOITE", label: "Noite" },
 ];
+function normShift(v: string | null | undefined) {
+  const k = String(v ?? "").trim().toUpperCase();
+  if (!k) return "";
+  if (k.startsWith("MAN")) return "MANHA";
+  if (k.startsWith("TAR")) return "TARDE";
+  if (k.startsWith("NOI")) return "NOITE";
+  return k;
+}
 
 export default async function Page({
   searchParams,
@@ -80,6 +88,11 @@ export default async function Page({
     .select("id,name,shift")
     .eq("school_id", profile.school_id)
     .order("name", { ascending: true });
+
+  const visibleClasses = ((classes as RefRow[] | null) ?? []).filter((c) => {
+    const s = normShift(c.shift ?? null);
+    return !s || s === shift;
+  });
 
   const { data: subjects } = await supabase
     .from("subjects")
@@ -131,9 +144,7 @@ export default async function Page({
     <Shell title="Grade semanal" subtitle="Arraste e solte para mover aulas/HA. Clique em um slot para editar.">
       <div className="grid gap-4">
         <Flash
-          message={
-            noCalendar ? "Nenhum horário encontrado para este turno. Configure em Horários." : null
-          }
+          message={noCalendar ? "Nenhum horário encontrado para este turno. Configure em Horários." : null}
           variant={noCalendar ? "info" : "info"}
         />
 
@@ -141,7 +152,7 @@ export default async function Page({
           shift={shift}
           shiftOptions={SHIFT_OPTIONS}
           teachers={visibleTeachers}
-          classes={((classes as RefRow[] | null) ?? []) as any}
+          classes={visibleClasses as any}
           subjects={((subjects as RefRow[] | null) ?? []) as any}
           rooms={((rooms as RefRow[] | null) ?? []) as any}
           timeSlots={((timeSlots as TimeSlotRow[] | null) ?? [])}

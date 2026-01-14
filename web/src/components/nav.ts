@@ -25,9 +25,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "Grade",
-    items: [
-      { href: "/schedule", label: "Montar grade" },
-    ],
+    items: [{ href: "/schedule", label: "Montar grade" }],
   },
   {
     title: "Relatórios",
@@ -36,6 +34,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/grades", label: "Grade por turma" },
       { href: "/grades/rooms", label: "Grade por sala" },
       { href: "/grades/teachers", label: "Grade por professor" },
+      { href: "/grades/ha", label: "Hora Atividade" },
     ],
   },
 ];

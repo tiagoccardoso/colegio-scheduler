@@ -13,7 +13,16 @@ type ApiResp = {
   teachers: TeacherItem[];
   school?: { name: string | null; term_label: string | null };
   timeSlots: { weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
-  grid: Record<string, { className: string; subject: string; room: string | null }>;
+  grid: Record<
+    string,
+    {
+      activityType: "AULA" | "HA" | string;
+      className: string;
+      subject: string;
+      room: string | null;
+      notes?: string | null;
+    }
+  >;
 };
 
 const WEEKDAY = ["", "2ª FEIRA", "3ª FEIRA", "4ª FEIRA", "5ª FEIRA", "6ª FEIRA"];
@@ -157,15 +166,29 @@ export function GradesByTeacherClient() {
                     </td>
                     {DAYS.map((d) => {
                       const cell = data.grid?.[`${d}-${p}`];
+                      const isHa = cell && String(cell.activityType || "").trim().toUpperCase() === "HA";
                       return (
                         <td key={d} className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16">
                           {cell ? (
                             <div className="leading-tight">
-                              <div className="font-semibold">{cell.className}</div>
-                              <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.subject}</div>
-                              {cell.room ? (
-                                <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.room}</div>
-                              ) : null}
+                              {isHa ? (
+                                <>
+                                  <div className="font-semibold">Hora Atividade</div>
+                                  {cell.notes ? (
+                                    <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.notes}</div>
+                                  ) : (
+                                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400">(sem observações)</div>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <div className="font-semibold">{cell.className}</div>
+                                  <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.subject}</div>
+                                  {cell.room ? (
+                                    <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.room}</div>
+                                  ) : null}
+                                </>
+                              )}
                             </div>
                           ) : null}
                         </td>
