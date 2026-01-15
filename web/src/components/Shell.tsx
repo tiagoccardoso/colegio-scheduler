@@ -2,17 +2,8 @@ import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
 import { MobileNav } from "@/components/MobileNav";
 import { NavLinks } from "@/components/NavLinks";
-
-function LogoMark() {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-white shadow-sm"
-    >
-      CS
-    </span>
-  );
-}
+import { SchoolLogoMark } from "@/components/SchoolLogoMark";
+import { SchoolNameLabel } from "@/components/SchoolNameLabel";
 
 export function Shell({
   title,
@@ -29,18 +20,26 @@ export function Shell({
         <div className="page-container">
           <div className="panel px-4 py-4">
             <div className="flex items-center gap-3">
-              <Link href="/dashboard" className="group flex items-center gap-3">
-                <LogoMark />
+              <div className="flex items-center gap-3">
+                <Link href="/dashboard" className="shrink-0" aria-label="Ir para o dashboard">
+                  <SchoolLogoMark />
+                </Link>
 
                 <div className="leading-tight">
-                  <div className="text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Colégio Scheduler
-                  </div>
-                  <div className="text-sm font-semibold text-zinc-900 underline-offset-4 group-hover:underline dark:text-zinc-100">
+                  <Link
+                    href="/dashboard"
+                    className="block text-xs font-semibold tracking-wide text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+                  >
+                    <SchoolNameLabel />
+                  </Link>
+                  <Link
+                    href="/director"
+                    className="block text-sm font-semibold text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
+                  >
                     Painel do diretor
-                  </div>
+                  </Link>
                 </div>
-              </Link>
+              </div>
 
               <div className="ml-auto flex items-center gap-2">
                 <div className="hidden lg:flex">

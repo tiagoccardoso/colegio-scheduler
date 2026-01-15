@@ -5,7 +5,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 type GradeByClassResp = {
   ok: boolean;
   shift: string;
-  school?: { name: string | null; term_label: string | null };
+  school?: { name: string | null };
   timeSlots: { weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
   classes: { id: string; header: { sala: string; levelStage: string; turma: string } }[];
   grid: Record<string, Record<string, { subject: string; teacher: string; room?: string | null }>>;
@@ -327,7 +327,7 @@ export function ScheduleGeneralClient(props: {
               await clearGrade(shift);
               await fetchState(shift);
             }}
-            className="h-10 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-red-900/40 dark:bg-zinc-950 dark:text-red-300 dark:hover:bg-red-950/30"
+            className="btn btn-danger h-10 disabled:opacity-60"
           >
             Excluir grade
           </button>
@@ -391,10 +391,9 @@ export function ScheduleGeneralClient(props: {
         </div>
       </div>
 
-      {(data?.school?.name || data?.school?.term_label) && (
+      {data?.school?.name && (
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
           <div className="font-semibold">{data?.school?.name ?? ""}</div>
-          <div className="text-zinc-600 dark:text-zinc-400">{data?.school?.term_label ?? ""}</div>
         </div>
       )}
 

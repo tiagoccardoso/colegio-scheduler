@@ -16,7 +16,7 @@ export default async function DashboardPage() {
             <li>Cadastre <strong>Horários</strong></li>
             <li>Cadastre <strong>Professores</strong></li>
             <li>Monte a grade em <strong>Montar grade</strong></li>
-            <li>Revise e ajuste em <strong>Grade semanal</strong></li>
+            <li>Revise e ajuste em <strong>Relatórios</strong></li>
           </ol>
         </div>
       </div>

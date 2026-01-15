@@ -48,7 +48,7 @@ export async function GET(req: Request) {
         supabase.from("rooms").select("*").eq("school_id", schoolId),
         supabase.from("subjects").select("*").eq("school_id", schoolId),
         supabase.from("teachers").select("*").eq("school_id", schoolId),
-        supabase.from("schools").select("id,name,term_label").eq("id", schoolId).maybeSingle(),
+        supabase.from("schools").select("id,name").eq("id", schoolId).maybeSingle(),
       ]);
 
     const timeSlots = normalizeTimeSlots((timeSlotsRaw as any[]) ?? []);
@@ -170,7 +170,6 @@ export async function GET(req: Request) {
       ok: true,
       school: {
         name: (school as any)?.name ?? null,
-        term_label: (school as any)?.term_label ?? null,
       },
       shift,
       timeSlots: timeSlots.map((t) => ({

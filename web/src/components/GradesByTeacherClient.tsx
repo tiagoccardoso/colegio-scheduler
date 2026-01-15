@@ -11,7 +11,7 @@ type ApiResp = {
   teacherId: string | null;
   teacher?: TeacherItem | null;
   teachers: TeacherItem[];
-  school?: { name: string | null; term_label: string | null };
+  school?: { name: string | null };
   timeSlots: { weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
   grid: Record<
     string,
@@ -122,10 +122,9 @@ export function GradesByTeacherClient() {
         </button>
       </div>
 
-      {(data?.school?.name || data?.school?.term_label || selectedTeacherLabel) && (
+      {(data?.school?.name || selectedTeacherLabel) && (
         <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:border-none print:shadow-none">
           <div className="font-semibold">{data?.school?.name ?? ""}</div>
-          <div className="text-zinc-600 dark:text-zinc-400">{data?.school?.term_label ?? ""}</div>
           <div className="mt-2 text-sm">
             <span className="font-semibold">Professor:</span> {selectedTeacherLabel || "—"}
             <span className="mx-2 text-zinc-400">•</span>

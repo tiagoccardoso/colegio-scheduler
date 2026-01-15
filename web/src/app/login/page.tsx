@@ -24,7 +24,6 @@ export default function LoginPage() {
 
   const [fullName, setFullName] = useState("");
   const [schoolName, setSchoolName] = useState("");
-  const [termLabel, setTermLabel] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,7 +61,6 @@ export default function LoginPage() {
           data: {
             full_name: fullName.trim(),
             school_name: schoolName.trim(),
-            term_label: termLabel.trim() || null,
           },
         },
       });
@@ -158,16 +156,6 @@ export default function LoginPage() {
                   <span className="text-sm font-semibold">Nome do colégio</span>
                   <input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="input" />
                 </label>
-
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Período (opcional)</span>
-                  <input
-                    value={termLabel}
-                    onChange={(e) => setTermLabel(e.target.value)}
-                    placeholder="Ex: 2º SEMESTRE 2025-2"
-                    className="input"
-                  />
-                </label>
               </div>
             ) : null}
 
@@ -198,7 +186,7 @@ export default function LoginPage() {
             </button>
 
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              Após criar a conta, finalize o cadastro (colégio/período) e então o sistema habilita as grades do seu colégio.
+              Após criar a conta, finalize o cadastro (colégio) e então o sistema habilita as grades do seu colégio.
             </p>
           </form>
         </section>

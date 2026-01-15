@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 type ApiResp = {
   ok: boolean;
   shift: string;
-  school?: { name: string | null; term_label: string | null };
+  school?: { name: string | null };
   timeSlots: {
     id?: string;
     weekday: number;
@@ -85,7 +85,6 @@ export function GradesHaClient() {
     const first = datasets?.find((d) => d?.ok) ?? datasets?.[0];
     return {
       schoolName: first?.school?.name ?? null,
-      termLabel: first?.school?.term_label ?? null,
       ok: Boolean(datasets?.some((d) => d?.ok)),
     };
   }, [datasets]);
@@ -174,10 +173,9 @@ export function GradesHaClient() {
         </button>
       </div>
 
-      {(header.schoolName || header.termLabel) && (
+      {header.schoolName && (
         <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:border-none print:shadow-none">
           <div className="font-semibold">{header.schoolName ?? ""}</div>
-          <div className="text-zinc-600 dark:text-zinc-400">{header.termLabel ?? ""}</div>
           <div className="mt-2 text-sm">
             <span className="font-semibold">Relatório:</span> Hora Atividade
             <span className="mx-2 text-zinc-400">•</span>

@@ -90,7 +90,7 @@ export function TeacherTeachingRulesEditor({
         <button
           type="button"
           onClick={() => setRules([])}
-          className="h-9 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          className="btn btn-danger h-9 px-3"
         >
           Limpar
         </button>
@@ -228,7 +228,7 @@ export function TeacherTeachingRulesEditor({
               <button
                 type="button"
                 onClick={() => setRules((prev) => prev.filter((_, i) => i !== idx))}
-                className="h-9 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                className="btn btn-danger h-9 px-3"
               >
                 Remover
               </button>

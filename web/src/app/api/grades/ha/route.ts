@@ -34,7 +34,7 @@ export async function GET(req: Request) {
         .in("weekday", [1, 2, 3, 4, 5])
         .order("weekday", { ascending: true })
         .order("period_index", { ascending: true }),
-      supabase.from("schools").select("id,name,term_label").eq("id", schoolId).maybeSingle(),
+      supabase.from("schools").select("id,name").eq("id", schoolId).maybeSingle(),
     ]);
 
     // Em alguns bancos antigos, teachers pode não ter short_name/display_order.
@@ -124,7 +124,6 @@ export async function GET(req: Request) {
       shift,
       school: {
         name: (school as any)?.name ?? null,
-        term_label: (school as any)?.term_label ?? null,
       },
       timeSlots: timeSlots.map((t) => ({
         id: t.id,

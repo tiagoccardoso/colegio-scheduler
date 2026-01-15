@@ -22,7 +22,6 @@ export default async function Page({
 
     const full_name = String(formData.get("full_name") || "").trim();
     const school_name = String(formData.get("school_name") || "").trim();
-    const term_label = String(formData.get("term_label") || "").trim();
 
     if (!full_name) redirect("/onboarding?error=" + encodeMsg("Informe seu nome."));
     if (!school_name) redirect("/onboarding?error=" + encodeMsg("Informe o nome do colégio."));
@@ -33,7 +32,7 @@ export default async function Page({
     // create school row (best-effort)
     await supabase
       .from("schools")
-      .upsert({ id: school_id, name: school_name, term_label: term_label || null }, { onConflict: "id" });
+      .upsert({ id: school_id, name: school_name }, { onConflict: "id" });
 
     // create/update profile
     const { error } = await supabase
@@ -63,12 +62,6 @@ export default async function Page({
               <span className="text-sm font-semibold">Nome do colégio</span>
               <input name="school_name" className="input" />
             </label>
-
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold">Período (opcional)</span>
-              <input name="term_label" placeholder="Ex: 2º SEMESTRE 2025-2" className="input" />
-            </label>
-
             <button type="submit" className="btn btn-primary w-fit">
               Concluir
             </button>
