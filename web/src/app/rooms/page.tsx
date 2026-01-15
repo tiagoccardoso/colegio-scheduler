@@ -14,10 +14,13 @@ type Row = {
   display_order?: number | null;
 };
 
-export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { supabase, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};
-
 
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
@@ -42,15 +45,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
-    if (!payload["name"]) {
-      redirect("/rooms?error=" + encodeMsg("Preencha o campo Nome."));
-    }
+    if (!payload.name) redirect("/rooms?error=" + encodeMsg("Preencha o campo Nome."));
 
     const { error } = await supabase.from("rooms").insert(payload);
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
-    redirect("/rooms?msg=" + encodeMsg("Salas criada com sucesso."));
+    redirect("/rooms?msg=" + encodeMsg("Sala criada com sucesso."));
   }
 
   async function updateAction(formData: FormData) {
@@ -67,15 +68,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       display_order: formData.get("display_order") ? Number(formData.get("display_order")) : null,
     };
 
-    if (!payload["name"]) {
-      redirect("/rooms?error=" + encodeMsg("Preencha o campo Nome."));
-    }
+    if (!payload.name) redirect("/rooms?error=" + encodeMsg("Preencha o campo Nome."));
 
     const { error } = await supabase.from("rooms").update(payload).eq("id", id).eq("school_id", profile.school_id);
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
-    redirect("/rooms?msg=" + encodeMsg("Salas atualizada."));
+    redirect("/rooms?msg=" + encodeMsg("Sala atualizada."));
   }
 
   async function deleteAction(formData: FormData) {
@@ -89,8 +88,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     if (error) redirect("/rooms?error=" + encodeMsg(error.message));
 
     revalidatePath("/rooms");
-    redirect("/rooms?msg=" + encodeMsg("Salas removida."));
+    redirect("/rooms?msg=" + encodeMsg("Sala removida."));
   }
+
+  const rowsTyped = (rows as Row[] | null) ?? [];
 
   return (
     <Shell title="Salas">
@@ -100,87 +101,62 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           variant={error ? "error" : msg ? "success" : "info"}
         />
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+        <div className="panel p-5">
           <details open>
             <summary className="cursor-pointer text-sm font-semibold">Cadastrar</summary>
             <form action={createAction} className="mt-4 grid max-w-xl gap-4">
-              <label className="grid gap-2">
-  <span className="text-sm font-semibold">Nome</span>
-  <input
-    name="name"
-    type="text"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Nome</span>
+                  <input name="name" type="text" required className="input" />
+                </label>
 
-    required
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
-<label className="grid gap-2">
-  <span className="text-sm font-semibold">Tipo</span>
-  <input
-    name="room_type"
-    type="text"
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Tipo</span>
+                  <input name="room_type" type="text" className="input" />
+                </label>
+              </div>
 
-
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
-              <button
-                type="submit"
-                className="w-fit rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
+              <button type="submit" className="btn btn-primary w-fit">
                 Salvar
               </button>
             </form>
           </details>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+        <div className="table-wrap">
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="table">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nome</th>
-<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Tipo</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Ações
-                  </th>
+                  <th className="table-th">Nome</th>
+                  <th className="table-th">Tipo</th>
+                  <th className="table-th">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {(rows as Row[] | null)?.map((row) => (
-                  <tr key={row.id} className="border-t border-zinc-100 dark:border-zinc-900">
-                    <td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{row.name ?? ""}</td>
-<td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{row.room_type ?? ""}</td>
-                    <td className="px-4 py-3">
+                {rowsTyped.map((row) => (
+                  <tr key={row.id} className="table-row">
+                    <td className="table-td">{row.name ?? ""}</td>
+                    <td className="table-td">{row.room_type ?? ""}</td>
+                    <td className="table-td">
                       <div className="flex flex-wrap items-center gap-2">
                         <details>
                           <summary className="cursor-pointer text-sm font-semibold">Editar</summary>
-                          <form action={updateAction} className="mt-3 grid w-[340px] gap-3">
+                          <form action={updateAction} className="mt-3 grid w-[360px] gap-3">
                             <input type="hidden" name="id" value={row.id} />
-                            <label className="grid gap-2">
-  <span className="text-sm font-semibold">Nome</span>
-  <input
-    name="name"
-    type="text"
-    defaultValue={row.name ?? ""}
-    required
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
-<label className="grid gap-2">
-  <span className="text-sm font-semibold">Tipo</span>
-  <input
-    name="room_type"
-    type="text"
-    defaultValue={row.room_type ?? ""}
 
-    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
-  />
-</label>
-                            <button
-                              type="submit"
-                              className="w-fit rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
-                            >
+                            <label className="grid gap-2">
+                              <span className="text-sm font-semibold">Nome</span>
+                              <input name="name" type="text" defaultValue={row.name ?? ""} required className="input" />
+                            </label>
+
+                            <label className="grid gap-2">
+                              <span className="text-sm font-semibold">Tipo</span>
+                              <input name="room_type" type="text" defaultValue={row.room_type ?? ""} className="input" />
+                            </label>
+
+                            <button type="submit" className="btn btn-primary w-fit">
                               Atualizar
                             </button>
                           </form>
@@ -188,11 +164,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
                         <form action={deleteAction}>
                           <input type="hidden" name="id" value={row.id} />
-                          <ConfirmButton
-                            confirmText="Tem certeza que deseja excluir?"
-                            type="submit"
-                            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                          >
+                          <ConfirmButton confirmText="Tem certeza que deseja excluir?" type="submit" className="btn btn-danger">
                             Excluir
                           </ConfirmButton>
                         </form>
@@ -201,9 +173,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   </tr>
                 ))}
 
-                {(rows?.length ?? 0) === 0 ? (
-                  <tr className="border-t border-zinc-100 dark:border-zinc-900">
-                    <td colSpan={3} className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-400">
+                {rowsTyped.length === 0 ? (
+                  <tr className="table-row">
+                    <td colSpan={3} className="table-td text-zinc-600 dark:text-zinc-400">
                       Nenhum registro encontrado.
                     </td>
                   </tr>

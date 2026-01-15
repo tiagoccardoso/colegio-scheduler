@@ -44,7 +44,7 @@ export function ScheduleTeacherPicker({
           name="teacherId"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/30 sm:min-w-[320px]"
+          className="select sm:min-w-[320px]"
         >
           <option value="">Todos</option>
           {teachers.map((t) => (
@@ -62,9 +62,9 @@ export function ScheduleTeacherPicker({
           if (canLoad) go(selected);
         }}
         className={
-          "h-10 rounded-xl px-4 text-sm font-semibold transition " +
+          "btn h-10 " +
           (canLoad
-            ? "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+            ? "btn-primary"
             : "cursor-not-allowed bg-zinc-200 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-500")
         }
       >
@@ -77,7 +77,7 @@ export function ScheduleTeacherPicker({
           setSelected("");
           clear();
         }}
-        className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        className="btn btn-secondary h-10"
       >
         Limpar
       </button>

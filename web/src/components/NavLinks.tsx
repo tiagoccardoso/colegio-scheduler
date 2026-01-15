@@ -14,16 +14,27 @@ export function NavLinks(props: { variant?: "top" | "sidebar" } = {}) {
   const LinkItem = ({ href, label }: { href: string; label: string }) => {
     const active = pathname === href;
 
+    if (variant === "top") {
+      return (
+        <Link
+          key={href}
+          href={href}
+          className={"nav-pill " + (active ? "nav-pill-active" : "")}
+        >
+          {label}
+        </Link>
+      );
+    }
+
     return (
       <Link
         key={href}
         href={href}
         className={
-          (variant === "sidebar" ? "rounded-xl px-3 py-2" : "rounded-full px-3 py-1") +
-          " text-sm transition " +
+          "rounded-2xl px-3 py-2 text-sm font-semibold transition " +
           (active
-            ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-            : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800")
+            ? "bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-950"
+            : "text-zinc-700 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-950/60")
         }
       >
         {label}
@@ -38,10 +49,10 @@ export function NavLinks(props: { variant?: "top" | "sidebar" } = {}) {
         key={href}
         href={href}
         className={
-          "block rounded-lg px-3 py-2 text-sm transition " +
+          "block rounded-xl px-3 py-2 text-sm font-semibold transition " +
           (active
-            ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-            : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800")
+            ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950"
+            : "text-zinc-700 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-900")
         }
       >
         {label}
@@ -58,9 +69,7 @@ export function NavLinks(props: { variant?: "top" | "sidebar" } = {}) {
 
         {reportsSection?.items?.length ? (
           <details key={pathname} className="relative">
-            <summary
-              className="list-none rounded-full px-3 py-1 text-sm transition text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
-            >
+            <summary className="nav-pill list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden">
               <span className="inline-flex items-center gap-2">
                 {reportsSection.title}
                 <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4 opacity-70">
@@ -73,7 +82,7 @@ export function NavLinks(props: { variant?: "top" | "sidebar" } = {}) {
               </span>
             </summary>
 
-            <div className="absolute left-0 z-20 mt-1 min-w-[220px] rounded-xl border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-900 dark:bg-zinc-950">
+            <div className="absolute left-0 z-20 mt-2 min-w-[240px] panel p-1">
               {reportsSection.items.map((l) => (
                 <DropdownLinkItem key={l.href} href={l.href} label={l.label} />
               ))}

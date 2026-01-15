@@ -42,7 +42,7 @@ export function MobileNav() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-900 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900 lg:hidden"
+        className="btn btn-secondary h-10 w-10 px-0 lg:hidden"
         aria-label={open ? "Fechar menu" : "Abrir menu"}
       >
         {open ? <XIcon /> : <MenuIcon />}
@@ -51,7 +51,8 @@ export function MobileNav() {
       {open ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-[86%] max-w-[320px] overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-black">
+
+          <div className="absolute left-0 top-0 h-full w-[88%] max-w-[360px] overflow-y-auto rounded-r-3xl border-r border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
             <div className="flex items-center justify-between">
               <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
                 Colégio Scheduler

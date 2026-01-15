@@ -42,7 +42,7 @@ export function ScheduleClassPicker({
           name="classId"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/30 sm:min-w-[260px]"
+          className="select sm:min-w-[260px]"
         >
           <option value="" disabled>
             Selecione...
@@ -63,9 +63,9 @@ export function ScheduleClassPicker({
         }}
         disabled={!canLoad}
         className={
-          "h-10 rounded-xl px-4 text-sm font-semibold transition " +
+          "btn h-10 " +
           (canLoad
-            ? "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+            ? "btn-primary"
             : "cursor-not-allowed bg-zinc-200 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-500")
         }
       >
