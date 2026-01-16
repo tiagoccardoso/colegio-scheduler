@@ -28,11 +28,12 @@ export default async function Page({
 
     // school_id = user.id (modelo 1 diretor -> 1 colégio)
     const school_id = user.id;
-
-    // create school row (best-effort)
-    await supabase
+    // create/update school
+    const { error: schoolError } = await supabase
       .from("schools")
       .upsert({ id: school_id, name: school_name }, { onConflict: "id" });
+
+    if (schoolError) redirect("/onboarding?error=" + encodeMsg(schoolError.message));
 
     // create/update profile
     const { error } = await supabase
