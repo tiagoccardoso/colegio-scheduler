@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { validateNoConflicts } from "@/lib/schedule/validate";
-import {
-  getState,
-  jsonError,
-  normalizeShift,
-  requireDirectorApi,
-  scheduleSnapshot,
-  validateTeacherForHaSlot,
-  validateTeacherForSlot,
-} from "../_utils";
+import { effectiveRoomId } from "@/lib/schedule/rules";
+import { applyTeachingRulesForTransition } from "../_teachingRulesSync";
+import { getState, jsonError, normalizeShift, requireDirectorApi, scheduleSnapshot } from "../_utils";
 
 export async function POST(req: Request) {
   const ctx = await requireDirectorApi();
@@ -38,7 +32,8 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (!current) return jsonError("Item não encontrado.");
 
-  const activityType = String((current as any)?.activity_type || "AULA").trim().toUpperCase() === "HA" ? "HA" : "AULA";
+  const activityType =
+    String((current as any)?.activity_type || "AULA").trim().toUpperCase() === "HA" ? "HA" : "AULA";
 
   const { data: slot } = await supabase
     .from("time_slots")
@@ -55,17 +50,23 @@ export async function POST(req: Request) {
   if (activityType === "AULA") {
     const { data } = await supabase
       .from("classes")
-      .select("id,shift")
+      .select("id,shift,default_room_id")
       .eq("id", current.class_id)
       .eq("school_id", profile.school_id)
       .maybeSingle();
     cls = data;
     if (!cls) return jsonError("Turma não encontrada.");
+
+    const classShift = String((cls as any)?.shift ?? "");
+    const slotShift = String((slot as any)?.shift ?? "");
+    if (classShift && slotShift && classShift !== slotShift) {
+      return jsonError("O horário selecionado não pertence ao turno da turma.");
+    }
   }
 
   const { data: teacher } = await supabase
     .from("teachers")
-    .select("id,shifts,availability,class_ids,subject_id,subject_ids,room_ids,available_weekdays")
+    .select("id,default_room_id")
     .eq("id", targetTeacherId)
     .eq("school_id", profile.school_id)
     .maybeSingle();
@@ -81,26 +82,28 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (occupied?.data) return jsonError("Destino já ocupado.");
 
+  // Para AULA, resolve a sala efetiva (para validar conflito de sala corretamente)
+  let resolvedRoomId: string | null = null;
   if (activityType === "AULA") {
-    const ruleError = validateTeacherForSlot({
-      teacher,
-      cls,
-      slot,
-      subject_id: current.subject_id,
-      room_id: current.room_id ?? null,
+    resolvedRoomId = effectiveRoomId({
+      scheduleRoomId: (current as any).room_id ?? null,
+      classDefaultRoomId: cls?.default_room_id ? String(cls.default_room_id) : null,
+      teacherDefaultRoomId: (teacher as any).default_room_id ? String((teacher as any).default_room_id) : null,
     });
-    if (ruleError) return jsonError(ruleError);
-  } else {
-    const ruleError = validateTeacherForHaSlot({ teacher, slot });
-    if (ruleError) return jsonError(ruleError);
+
+    if (!resolvedRoomId) {
+      return jsonError(
+        "Defina a sala (ou configure sala padrão na turma ou no professor) para mover/salvar a aula.",
+      );
+    }
   }
 
   const conflict = await validateNoConflicts({
     supabase,
-    class_id: activityType === "AULA" ? current.class_id : "",
+    class_id: activityType === "AULA" ? (current as any).class_id : "",
     time_slot_id: targetTimeSlotId,
     teacher_id: targetTeacherId,
-    room_id: activityType === "AULA" ? (current.room_id ?? null) : null,
+    room_id: activityType === "AULA" ? resolvedRoomId : null,
     schedule_id: scheduleId,
   });
   if (conflict) return jsonError(conflict.message);
@@ -118,6 +121,22 @@ export async function POST(req: Request) {
   if (error) return jsonError(error.message || "Falha ao mover.");
 
   const after = scheduleSnapshot(afterRow);
+
+  try {
+    await applyTeachingRulesForTransition({
+      supabase,
+      schoolId: profile.school_id,
+      from: before,
+      to: after,
+    });
+  } catch (err: any) {
+    // rollback best-effort
+    if (before?.id) {
+      await supabase.from("schedules").upsert({ ...before, school_id: profile.school_id }, { onConflict: "id" });
+    }
+    return jsonError(err?.message || "Falha ao atualizar cadastro do professor.");
+  }
+
   await supabase.from("schedule_audit_events").insert({
     school_id: profile.school_id,
     user_id: user.id,

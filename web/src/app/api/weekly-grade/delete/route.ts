@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { applyTeachingRulesForTransition } from "../_teachingRulesSync";
 import { getState, jsonError, normalizeShift, requireDirectorApi, scheduleSnapshot } from "../_utils";
 
 export async function POST(req: Request) {
@@ -28,7 +29,23 @@ export async function POST(req: Request) {
 
   const before = scheduleSnapshot(current);
 
-  const { error } = await supabase.from("schedules").delete().eq("id", scheduleId).eq("school_id", profile.school_id);
+  // Remover regra do professor (quando for AULA) antes de excluir.
+  try {
+    await applyTeachingRulesForTransition({
+      supabase,
+      schoolId: profile.school_id,
+      from: before,
+      to: null,
+    });
+  } catch (err: any) {
+    return jsonError(err?.message || "Falha ao atualizar cadastro do professor.");
+  }
+
+  const { error } = await supabase
+    .from("schedules")
+    .delete()
+    .eq("id", scheduleId)
+    .eq("school_id", profile.school_id);
   if (error) return jsonError(error.message || "Falha ao excluir.");
 
   await supabase.from("schedule_audit_events").insert({

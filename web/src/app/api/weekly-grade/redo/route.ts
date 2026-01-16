@@ -1,5 +1,25 @@
 import { NextResponse } from "next/server";
+import { applyTeachingRulesForTransition } from "../_teachingRulesSync";
 import { getState, jsonError, normalizeShift, requireDirectorApi } from "../_utils";
+
+async function applyScheduleSnapshot(args: {
+  supabase: any;
+  schoolId: string;
+  snapshot: any | null;
+  deleteIdFallback?: string | null;
+}) {
+  const { supabase, schoolId, snapshot, deleteIdFallback } = args;
+
+  if (!snapshot) {
+    const id = deleteIdFallback ? String(deleteIdFallback) : "";
+    if (!id) return { error: null };
+    return await supabase.from("schedules").delete().eq("id", id).eq("school_id", schoolId);
+  }
+
+  return await supabase
+    .from("schedules")
+    .upsert({ ...snapshot, school_id: schoolId }, { onConflict: "id" });
+}
 
 export async function POST(req: Request) {
   const ctx = await requireDirectorApi();
@@ -28,20 +48,39 @@ export async function POST(req: Request) {
   if (error || !ev) return jsonError("Evento não encontrado.");
   if (!ev.undone_at) return jsonError("Este evento não está desfeito.");
 
-  const after = ev.after as any;
+  const before = (ev.before as any) ?? null;
+  const after = (ev.after as any) ?? null;
 
-  // Redo means: apply 'after'
-  if (!after) {
-    const id = String((ev.before as any)?.id || "");
-    if (id) {
-      const { error: delErr } = await supabase.from("schedules").delete().eq("id", id).eq("school_id", profile.school_id);
-      if (delErr) return jsonError(delErr.message || "Falha ao refazer.");
-    }
-  } else {
-    const { error: upErr } = await supabase
-      .from("schedules")
-      .upsert({ ...after, school_id: profile.school_id }, { onConflict: "id" });
-    if (upErr) return jsonError(upErr.message || "Falha ao refazer.");
+  // Redo: transiciona do estado "before" -> "after"
+  const fromSnap = before;
+  const toSnap = after;
+
+  const applyRes = await applyScheduleSnapshot({
+    supabase,
+    schoolId: profile.school_id,
+    snapshot: toSnap,
+    deleteIdFallback: fromSnap?.id ?? null,
+  });
+
+  if (applyRes?.error) return jsonError(applyRes.error.message || "Falha ao refazer.");
+
+  try {
+    await applyTeachingRulesForTransition({
+      supabase,
+      schoolId: profile.school_id,
+      from: fromSnap,
+      to: toSnap,
+    });
+  } catch (err: any) {
+    // rollback: volta para o estado "before"
+    await applyScheduleSnapshot({
+      supabase,
+      schoolId: profile.school_id,
+      snapshot: fromSnap,
+      deleteIdFallback: toSnap?.id ?? null,
+    });
+
+    return jsonError(err?.message || "Falha ao atualizar cadastro do professor.");
   }
 
   await supabase

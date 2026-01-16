@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { validateNoConflicts } from "@/lib/schedule/validate";
-import {
-  getState,
-  jsonError,
-  normalizeShift,
-  requireDirectorApi,
-  scheduleSnapshot,
-  validateTeacherForHaSlot,
-  validateTeacherForSlot,
-} from "../_utils";
+import { effectiveRoomId } from "@/lib/schedule/rules";
+import { applyTeachingRulesForTransition } from "../_teachingRulesSync";
+import { getState, jsonError, normalizeShift, requireDirectorApi, scheduleSnapshot } from "../_utils";
 
 export async function POST(req: Request) {
   const ctx = await requireDirectorApi();
@@ -28,7 +22,7 @@ export async function POST(req: Request) {
   const teacherId = String(body.teacherId || "");
   const timeSlotId = String(body.timeSlotId || "");
   const rawActivityType = String(body.activityType ?? body.activity_type ?? "AULA");
-  const activityType = String(rawActivityType).trim().toUpperCase() === "HA" ? "HA" : "AULA";
+  const activityType = rawActivityType.trim().toUpperCase() === "HA" ? "HA" : "AULA";
 
   const classId = String(body.classId || "");
   const subjectId = String(body.subjectId || "");
@@ -54,27 +48,40 @@ export async function POST(req: Request) {
 
   const { data: teacher } = await supabase
     .from("teachers")
-    .select("id,shifts,availability,class_ids,subject_id,subject_ids,room_ids,available_weekdays")
+    .select("id,default_room_id")
     .eq("id", teacherId)
     .eq("school_id", profile.school_id)
     .maybeSingle();
   if (!teacher) return jsonError("Professor não encontrado.");
 
-  // Validate by type
+  let resolvedRoomId: string | null = null;
+
   if (activityType === "AULA") {
     const { data: cls } = await supabase
       .from("classes")
-      .select("id,shift")
+      .select("id,shift,default_room_id")
       .eq("id", classId)
       .eq("school_id", profile.school_id)
       .maybeSingle();
     if (!cls) return jsonError("Turma não encontrada.");
 
-    const ruleError = validateTeacherForSlot({ teacher, cls, slot, subject_id: subjectId, room_id: roomId });
-    if (ruleError) return jsonError(ruleError);
-  } else {
-    const ruleError = validateTeacherForHaSlot({ teacher, slot });
-    if (ruleError) return jsonError(ruleError);
+    const classShift = String((cls as any)?.shift ?? "");
+    const slotShift = String((slot as any)?.shift ?? "");
+    if (classShift && slotShift && classShift !== slotShift) {
+      return jsonError("O horário selecionado não pertence ao turno da turma.");
+    }
+
+    resolvedRoomId = effectiveRoomId({
+      scheduleRoomId: roomId,
+      classDefaultRoomId: (cls as any).default_room_id ? String((cls as any).default_room_id) : null,
+      teacherDefaultRoomId: (teacher as any).default_room_id ? String((teacher as any).default_room_id) : null,
+    });
+
+    if (!resolvedRoomId) {
+      return jsonError(
+        "Defina a sala (ou configure sala padrão na turma ou no professor) para salvar a aula.",
+      );
+    }
   }
 
   // Identify existing schedule row
@@ -118,7 +125,7 @@ export async function POST(req: Request) {
     class_id: activityType === "AULA" ? classId : "",
     time_slot_id: timeSlotId,
     teacher_id: teacherId,
-    room_id: activityType === "AULA" ? roomId : null,
+    room_id: activityType === "AULA" ? resolvedRoomId : null,
     schedule_id: current?.id ?? null,
   });
 
@@ -129,18 +136,20 @@ export async function POST(req: Request) {
   let writeError: any = null;
   let afterRow: any = null;
 
+  const schedulePayload: any = {
+    activity_type: activityType,
+    teacher_id: teacherId,
+    time_slot_id: timeSlotId,
+    class_id: activityType === "AULA" ? classId : null,
+    subject_id: activityType === "AULA" ? subjectId : null,
+    room_id: activityType === "AULA" ? resolvedRoomId : null,
+    notes,
+  };
+
   if (current?.id) {
     const { data, error } = await supabase
       .from("schedules")
-      .update({
-        activity_type: activityType,
-        teacher_id: teacherId,
-        time_slot_id: timeSlotId,
-        class_id: activityType === "AULA" ? classId : null,
-        subject_id: activityType === "AULA" ? subjectId : null,
-        room_id: activityType === "AULA" ? roomId : null,
-        notes,
-      })
+      .update(schedulePayload)
       .eq("id", current.id)
       .eq("school_id", profile.school_id)
       .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
@@ -150,16 +159,7 @@ export async function POST(req: Request) {
   } else {
     const { data, error } = await supabase
       .from("schedules")
-      .insert({
-        school_id: profile.school_id,
-        activity_type: activityType,
-        teacher_id: teacherId,
-        time_slot_id: timeSlotId,
-        class_id: activityType === "AULA" ? classId : null,
-        subject_id: activityType === "AULA" ? subjectId : null,
-        room_id: activityType === "AULA" ? roomId : null,
-        notes,
-      })
+      .insert({ school_id: profile.school_id, ...schedulePayload })
       .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
       .maybeSingle();
     writeError = error;
@@ -169,6 +169,28 @@ export async function POST(req: Request) {
   if (writeError) return jsonError(writeError.message || "Falha ao salvar.");
 
   const after = scheduleSnapshot(afterRow);
+
+  // Sincroniza com o cadastro do professor (AULA) para que a Grade Semanal seja fonte de verdade
+  try {
+    await applyTeachingRulesForTransition({
+      supabase,
+      schoolId: profile.school_id,
+      from: before,
+      to: after,
+    });
+  } catch (err: any) {
+    // rollback best-effort
+    if (before?.id) {
+      await supabase
+        .from("schedules")
+        .upsert({ ...before, school_id: profile.school_id }, { onConflict: "id" });
+    } else if (after?.id) {
+      await supabase.from("schedules").delete().eq("id", after.id).eq("school_id", profile.school_id);
+    }
+
+    return jsonError(err?.message || "Falha ao atualizar cadastro do professor.");
+  }
+
   await supabase.from("schedule_audit_events").insert({
     school_id: profile.school_id,
     user_id: user.id,
