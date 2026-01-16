@@ -154,6 +154,28 @@ export function WeeklyGradeBoard(props: {
 
   const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s.name ?? ""])), [subjects]);
 
+  const timeByPeriod = useMemo(() => {
+    // time_slots são por dia + período; para o relatório semanal, mostramos um horário "canônico" por período.
+    // Se houver variação entre os dias, exibimos "Varia" e colocamos os detalhes no tooltip.
+    const rangesByPeriod = new Map<number, Set<string>>();
+    for (const ts of timeSlots) {
+      const p = Number(ts.period_index ?? 0);
+      if (!p) continue;
+      const range = ts.starts_at && ts.ends_at ? `${ts.starts_at}–${ts.ends_at}` : "";
+      if (!range) continue;
+      if (!rangesByPeriod.has(p)) rangesByPeriod.set(p, new Set());
+      rangesByPeriod.get(p)!.add(range);
+    }
+
+    const out = new Map<number, { label: string; title?: string }>();
+    for (const [p, set] of rangesByPeriod.entries()) {
+      const ranges = Array.from(set).sort();
+      if (ranges.length === 1) out.set(p, { label: ranges[0] });
+      else out.set(p, { label: "Varia", title: ranges.join(" / ") });
+    }
+    return out;
+  }, [timeSlots]);
+
   async function refresh() {
     const r = await apiJson<{ schedules: ScheduleRow[]; events: AuditEvent[] }>(
       `/api/weekly-grade/state?shift=${encodeURIComponent(shift)}`,
@@ -376,16 +398,19 @@ export function WeeklyGradeBoard(props: {
       <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
         <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
           <div className="overflow-x-auto">
-            <table className="min-w-[980px] w-full">
+            <table className="min-w-[1160px] w-full table-fixed">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                  <th className="sticky left-0 z-20 w-[220px] bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
                     Professor
+                  </th>
+                  <th className="sticky left-[220px] z-10 w-[140px] bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                    Horário
                   </th>
                   {WEEKDAYS.map((d) => (
                     <th
                       key={d.key}
-                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                      className="w-[160px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
                     >
                       {d.label}
                     </th>
@@ -395,22 +420,43 @@ export function WeeklyGradeBoard(props: {
               <tbody>
                 {teachers.map((t) => (
                   <tr key={t.id} className="border-t border-zinc-100 dark:border-zinc-900">
-                    <td className="sticky left-0 z-10 w-[220px] bg-white px-4 py-3 align-top dark:bg-zinc-950">
+                    <td className="sticky left-0 z-20 w-[220px] bg-white px-4 py-3 align-top dark:bg-zinc-950">
                       <div className="grid gap-1">
                         <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t.name || "(sem nome)"}</span>
                         <span className="text-xs text-zinc-500">{t.subject_id ? subjectById.get(t.subject_id) || "" : ""}</span>
                       </div>
                     </td>
 
+                    <td className="sticky left-[220px] z-10 w-[140px] bg-white px-3 py-3 align-top dark:bg-zinc-950">
+                      <div className="grid gap-2 wg-stack">
+                        {Array.from({ length: maxPeriods }, (_, i) => i + 1).map((p) => {
+                          const info = timeByPeriod.get(p);
+                          return (
+                            <div
+                              key={p}
+                              title={info?.title}
+                              className="wg-slot h-[84px] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-200"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold">{p}º</span>
+                                <span className="text-[11px] text-zinc-600 dark:text-zinc-400">{info?.label || ""}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </td>
+
                     {WEEKDAYS.map((d) => (
-                      <td key={d.key} className="px-3 py-3 align-top">
-                        <div className="grid gap-2">
+                      <td key={d.key} className="w-[160px] px-3 py-3 align-top">
+                        <div className="grid gap-2 wg-stack">
                           {Array.from({ length: maxPeriods }, (_, i) => i + 1).map((p) => {
                             const ts = timeSlotFor(d.key, p);
                             const s = scheduleFor(t.id, d.key, p);
                             const empty = !s;
                             const canDrop = Boolean(ts?.id);
                             const act = normActivityType(s?.activity_type);
+                            const subjectName = s?.subject?.name || (s?.subject_id ? subjectById.get(s.subject_id) || "" : "");
 
                             return (
                               <div
@@ -422,7 +468,7 @@ export function WeeklyGradeBoard(props: {
                                   if (canDrop) void onDrop(e, t.id, d.key, p);
                                 }}
                                 className={
-                                  "rounded-xl border px-3 py-2 text-xs transition " +
+                                  "wg-slot h-[84px] overflow-hidden rounded-xl border px-3 py-2 text-xs transition " +
                                   (empty
                                     ? "border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900"
                                     : "border-zinc-200 bg-white text-zinc-900 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900")
@@ -435,37 +481,35 @@ export function WeeklyGradeBoard(props: {
                                       if (ts?.id) openEditor(t.id, ts.id);
                                       else setBanner({ kind: "error", text: "Slot não configurado em Horários." });
                                     }}
-                                    className="text-left grow"
+                                    className="text-left grow min-w-0"
                                   >
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="font-semibold">
-                                        {p}º {ts?.starts_at && ts?.ends_at ? `${ts.starts_at}–${ts.ends_at}` : ""}
-                                      </span>
+                                      <span className="font-semibold">{p}º</span>
                                       <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                                        {empty ? "vazio" : act === "HA" ? "HA" : ""}
+                                        {act === "HA" ? "HA" : ""}
                                       </span>
                                     </div>
 
                                     {s ? (
                                       act === "HA" ? (
                                         <div className="mt-1 grid gap-1">
-                                          <div className="text-xs font-semibold">Hora Atividade</div>
+                                          <div className="text-xs font-semibold leading-snug wg-clamp-1">Hora Atividade</div>
                                           {s.notes ? (
-                                            <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{s.notes}</div>
-                                          ) : (
-                                            <div className="text-[11px] text-zinc-500 dark:text-zinc-400">(sem observações)</div>
-                                          )}
+                                            <div className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-snug wg-clamp-2">{s.notes}</div>
+                                          ) : null}
                                         </div>
                                       ) : (
-                                        <div className="mt-1 grid gap-1">
-                                          <div className="text-xs font-semibold">
-                                            {s.class?.name || "Turma"}
-                                            {s.subject?.name ? ` — ${s.subject.name}` : ""}
+                                        <div className="mt-1 grid gap-0.5">
+                                          <div className="text-xs font-semibold leading-snug wg-clamp-1">{s.class?.name || "Turma"}</div>
+                                          <div className="text-[11px] text-zinc-700 dark:text-zinc-200 leading-snug wg-clamp-1">
+                                            {subjectName || "Disciplina"}
                                           </div>
-                                          <div className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                                          <div className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-snug wg-clamp-1">
                                             {s.room?.name ? `Sala ${s.room.name}` : ""}
-                                            {s.notes ? (s.room?.name ? ` · ${s.notes}` : s.notes) : ""}
                                           </div>
+                                          {s.notes ? (
+                                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-snug wg-clamp-1">{s.notes}</div>
+                                          ) : null}
                                         </div>
                                       )
                                     ) : (
@@ -576,6 +620,17 @@ export function WeeklyGradeBoard(props: {
       ) : null}
 
       <style jsx global>{`
+        .wg-stack { grid-auto-rows: 84px; }
+
+        .wg-clamp-1,
+        .wg-clamp-2 {
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .wg-clamp-1 { -webkit-line-clamp: 1; }
+        .wg-clamp-2 { -webkit-line-clamp: 2; }
+
         @media print {
           @page { size: A4 landscape; margin: 12mm; }
           table, th, td { border: 1px solid #333 !important; }
