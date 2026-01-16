@@ -396,21 +396,27 @@ export function WeeklyGradeBoard(props: {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1160px] w-full table-fixed">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+          {/*
+            Mantém a grade "inteira" (sem cortar a última coluna) em telas comuns.
+            Em telas menores, o wrapper permite scroll horizontal.
+
+            Obs: usamos CSS vars para manter widths/offsets coerentes com sticky.
+          */}
+          <div className="w-full overflow-x-auto [--wg-prof:200px] [--wg-time:132px] [--wg-day:140px]">
+            <table className="w-full table-fixed min-w-[calc(var(--wg-prof)+var(--wg-time)+(var(--wg-day)*5))]">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 w-[220px] bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                  <th className="sticky left-0 z-20 w-[var(--wg-prof)] bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
                     Professor
                   </th>
-                  <th className="sticky left-[220px] z-10 w-[140px] bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                  <th className="sticky left-[var(--wg-prof)] z-10 w-[var(--wg-time)] bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
                     Horário
                   </th>
                   {WEEKDAYS.map((d) => (
                     <th
                       key={d.key}
-                      className="w-[160px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                      className="w-[var(--wg-day)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
                     >
                       {d.label}
                     </th>
@@ -420,14 +426,14 @@ export function WeeklyGradeBoard(props: {
               <tbody>
                 {teachers.map((t) => (
                   <tr key={t.id} className="border-t border-zinc-100 dark:border-zinc-900">
-                    <td className="sticky left-0 z-20 w-[220px] bg-white px-4 py-3 align-top dark:bg-zinc-950">
+                    <td className="sticky left-0 z-20 w-[var(--wg-prof)] bg-white px-4 py-3 align-top dark:bg-zinc-950">
                       <div className="grid gap-1">
                         <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t.name || "(sem nome)"}</span>
                         <span className="text-xs text-zinc-500">{t.subject_id ? subjectById.get(t.subject_id) || "" : ""}</span>
                       </div>
                     </td>
 
-                    <td className="sticky left-[220px] z-10 w-[140px] bg-white px-3 py-3 align-top dark:bg-zinc-950">
+                    <td className="sticky left-[var(--wg-prof)] z-10 w-[var(--wg-time)] bg-white px-3 py-3 align-top dark:bg-zinc-950">
                       <div className="grid gap-2 wg-stack">
                         {Array.from({ length: maxPeriods }, (_, i) => i + 1).map((p) => {
                           const info = timeByPeriod.get(p);
@@ -448,7 +454,7 @@ export function WeeklyGradeBoard(props: {
                     </td>
 
                     {WEEKDAYS.map((d) => (
-                      <td key={d.key} className="w-[160px] px-3 py-3 align-top">
+                      <td key={d.key} className="w-[var(--wg-day)] px-3 py-3 align-top">
                         <div className="grid gap-2 wg-stack">
                           {Array.from({ length: maxPeriods }, (_, i) => i + 1).map((p) => {
                             const ts = timeSlotFor(d.key, p);
@@ -545,7 +551,7 @@ export function WeeklyGradeBoard(props: {
 
                 {teachers.length === 0 ? (
                   <tr className="border-t border-zinc-100 dark:border-zinc-900">
-                    <td colSpan={6} className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-400">
+                    <td colSpan={7} className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-400">
                       Nenhum professor encontrado para este turno.
                     </td>
                   </tr>
