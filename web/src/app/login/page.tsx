@@ -20,7 +20,7 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
 
   const [fullName, setFullName] = useState("");
   const [schoolName, setSchoolName] = useState("");
@@ -40,6 +40,15 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      if (mode === "forgot") {
+        if (!email.trim()) throw new Error("Informe seu e-mail.");
+        const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+        if (error) throw error;
+        setInfoMsg("Se existir uma conta com este e-mail, enviamos um link para redefinir a senha.");
+        return;
+      }
+
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -109,7 +118,7 @@ export default function LoginPage() {
             <div>
               <div className="text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">Painel do diretor</div>
               <h2 className="text-xl font-semibold tracking-tight">
-                {mode === "login" ? "Entrar" : "Criar conta"}
+                {mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Recuperar senha"}
               </h2>
             </div>
 
@@ -164,10 +173,12 @@ export default function LoginPage() {
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" />
             </label>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold">Senha</span>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" />
-            </label>
+            {mode !== "forgot" ? (
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Senha</span>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" />
+              </label>
+            ) : null}
 
             {mode === "signup" ? (
               <label className="grid gap-2">
@@ -182,8 +193,34 @@ export default function LoginPage() {
             ) : null}
 
             <button disabled={loading} className="btn btn-primary mt-1 w-full">
-              {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
+              {loading
+                ? "Aguarde..."
+                : mode === "login"
+                  ? "Entrar"
+                  : mode === "signup"
+                    ? "Criar conta"
+                    : "Enviar link"}
             </button>
+
+            {mode === "login" ? (
+              <button
+                type="button"
+                onClick={() => setMode("forgot")}
+                className="btn btn-ghost w-full"
+              >
+                Esqueci minha senha
+              </button>
+            ) : null}
+
+            {mode === "forgot" ? (
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="btn btn-ghost w-full"
+              >
+                Voltar para login
+              </button>
+            ) : null}
 
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
               Após criar a conta, finalize o cadastro (colégio) e então o sistema habilita as grades do seu colégio.

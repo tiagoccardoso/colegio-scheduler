@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
@@ -8,6 +9,61 @@ import { decodeMsg, encodeMsg } from "@/lib/flash";
 
 const BUCKET = "school-logos";
 const logoPath = (schoolId: string) => `schools/${schoolId}/logo`;
+
+type LogoPick = {
+  path: string;
+  version: string;
+  size: number;
+  mime?: string;
+};
+
+async function pickSchoolLogo(supabase: any, schoolId: string): Promise<LogoPick | null> {
+  const base = `schools/${schoolId}`;
+
+  const { data: top } = await supabase.storage.from(BUCKET).list(base, { limit: 100 });
+  const { data: nested } = await supabase.storage.from(BUCKET).list(`${base}/logo`, { limit: 100 });
+
+  const candidates: Array<any> = [];
+  (top ?? []).forEach((it: any) => candidates.push({ where: "top", it }));
+  (nested ?? []).forEach((it: any) => candidates.push({ where: "nested", it }));
+
+  // Normalize into full paths
+  const items = candidates
+    .map(({ where, it }) => {
+      const name = String(it?.name || "");
+      const fullPath = where === "nested" ? `${base}/logo/${name}` : `${base}/${name}`;
+      const size = Number(it?.metadata?.size ?? 0);
+      const mime = String(it?.metadata?.mimetype ?? it?.metadata?.contentType ?? "");
+      const updatedAt = String(it?.updated_at ?? it?.updatedAt ?? "");
+      const version = updatedAt ? String(new Date(updatedAt).getTime()) : String(Date.now());
+      return { name, path: fullPath, size, mime, version };
+    })
+    .filter((x) => {
+      // Accept logo, logo.<ext>, or anything inside /logo/
+      if (x.path.includes(`${base}/logo/`)) return true;
+      return x.name === "logo" || x.name.startsWith("logo.");
+    });
+
+  // Prefer the canonical path the app uses (schools/<id>/logo)
+  const preferred = items.find((x) => x.path === logoPath(schoolId));
+  const byExt = items
+    .filter((x) => x.name.startsWith("logo."))
+    .sort((a, b) => {
+      const order = ["png", "webp", "jpg", "jpeg", "svg"];
+      const ea = a.name.split(".").pop() || "";
+      const eb = b.name.split(".").pop() || "";
+      return order.indexOf(ea) - order.indexOf(eb);
+    })[0];
+  const nestedFirst = items.find((x) => x.path.includes(`${base}/logo/`));
+
+  const pick = preferred ?? byExt ?? nestedFirst;
+  if (!pick) return null;
+
+  // Treat empty or non-image payload as “no logo” (works even without DELETE policy).
+  if (!pick.size || (pick.mime && !pick.mime.startsWith("image/"))) return null;
+
+  return pick;
+}
 
 export default async function DirectorProfilePage({
   searchParams,
@@ -20,6 +76,7 @@ export default async function DirectorProfilePage({
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
   const bust = typeof sp.v === "string" ? sp.v : "";
+  const pendingEmail = typeof sp.pending_email === "string" ? sp.pending_email : null;
 
   const { data: school } = await supabase
     .from("schools")
@@ -27,8 +84,13 @@ export default async function DirectorProfilePage({
     .eq("id", profile.school_id)
     .maybeSingle();
 
-  const { data: logoPublic } = supabase.storage.from(BUCKET).getPublicUrl(logoPath(profile.school_id));
-  const logoUrl = logoPublic?.publicUrl ? `${logoPublic.publicUrl}${bust ? `?v=${bust}` : ""}` : null;
+  const pickedLogo = await pickSchoolLogo(supabase, profile.school_id);
+  const { data: logoPublic } = supabase.storage
+    .from(BUCKET)
+    .getPublicUrl(pickedLogo?.path ?? logoPath(profile.school_id));
+  const logoUrl = pickedLogo?.path && logoPublic?.publicUrl
+    ? `${logoPublic.publicUrl}?v=${bust || pickedLogo.version}`
+    : null;
 
   async function saveAction(formData: FormData) {
     "use server";
@@ -98,6 +160,118 @@ export default async function DirectorProfilePage({
     );
   }
 
+  async function requestEmailChangeAction(formData: FormData) {
+    "use server";
+
+    const { supabase } = await requireDirector();
+    const newEmail = String(formData.get("new_email") || "").trim().toLowerCase();
+    if (!newEmail || !newEmail.includes("@")) {
+      redirect("/director?error=" + encodeMsg("Informe um e-mail válido."));
+    }
+
+    const h = await headers();
+    const origin = h.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const emailRedirectTo = `${origin}/auth/callback?next=/director`;
+
+    const { error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo });
+    if (error) redirect("/director?error=" + encodeMsg(error.message));
+
+    redirect(
+      "/director?msg=" +
+        encodeMsg("Enviamos um link de confirmação para o novo e-mail.") +
+        `&pending_email=${encodeURIComponent(newEmail)}`,
+    );
+  }
+
+  async function resendEmailChangeAction(formData: FormData) {
+    "use server";
+
+    const { supabase } = await requireDirector();
+    const newEmail = String(formData.get("pending_email") || "").trim().toLowerCase();
+    if (!newEmail || !newEmail.includes("@")) {
+      redirect("/director?error=" + encodeMsg("Informe um e-mail válido para reenviar."));
+    }
+
+    const h = await headers();
+    const origin = h.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const emailRedirectTo = `${origin}/auth/callback?next=/director`;
+
+    // @ts-ignore: tipos variam por versão, mas a API existe no supabase-js v2
+    const { error } = await supabase.auth.resend({ type: "email_change", email: newEmail, options: { emailRedirectTo } });
+    if (error) redirect("/director?error=" + encodeMsg(error.message));
+
+    redirect(
+      "/director?msg=" +
+        encodeMsg("Reenviamos o link de confirmação.") +
+        `&pending_email=${encodeURIComponent(newEmail)}`,
+    );
+  }
+
+  async function removeLogoAction() {
+    "use server";
+
+    const { supabase, profile } = await requireDirector();
+    const base = `schools/${profile.school_id}`;
+
+    const { data: top } = await supabase.storage.from(BUCKET).list(base, { limit: 100 });
+    const { data: nested } = await supabase.storage.from(BUCKET).list(`${base}/logo`, { limit: 100 });
+
+    const paths: string[] = [];
+    (top ?? []).forEach((it: any) => {
+      const name = String(it?.name || "");
+      if (name === "logo" || name.startsWith("logo.")) paths.push(`${base}/${name}`);
+    });
+    (nested ?? []).forEach((it: any) => {
+      const name = String(it?.name || "");
+      if (name) paths.push(`${base}/logo/${name}`);
+    });
+
+    // Fallback: se não encontramos nada, ainda assim tentamos no caminho padrão.
+    if (paths.length === 0) paths.push(logoPath(profile.school_id));
+
+    // 1) Tenta apagar (funciona se você ativou a policy de DELETE).
+    const { error: delError } = await supabase.storage.from(BUCKET).remove(paths);
+
+    // 2) Se não puder apagar (RLS), sobrescreve com payload vazio e a UI trata como "Sem logo".
+    if (delError) {
+      const empty = new Blob([]);
+      for (const p of paths) {
+        await supabase.storage.from(BUCKET).upload(p, empty, {
+          upsert: true,
+          contentType: "application/octet-stream",
+        });
+      }
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/director");
+    redirect(
+      "/director?msg=" +
+        encodeMsg("Logomarca removida!") +
+        `&v=${Date.now()}`,
+    );
+  }
+
+  async function updatePasswordAction(formData: FormData) {
+    "use server";
+
+    const { supabase } = await requireDirector();
+    const p1 = String(formData.get("new_password") || "");
+    const p2 = String(formData.get("new_password2") || "");
+
+    if (!p1 || p1.length < 6) {
+      redirect("/director?error=" + encodeMsg("A nova senha deve ter pelo menos 6 caracteres."));
+    }
+    if (p1 !== p2) {
+      redirect("/director?error=" + encodeMsg("As senhas não conferem."));
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: p1 });
+    if (error) redirect("/director?error=" + encodeMsg(error.message));
+
+    redirect("/director?msg=" + encodeMsg("Senha alterada!") + `&v=${Date.now()}`);
+  }
+
   return (
     <Shell title="Perfil do diretor" subtitle="Edite seus dados e personalize a logomarca do colégio">
       <div className="grid gap-4">
@@ -106,28 +280,74 @@ export default async function DirectorProfilePage({
 
         <form action={saveAction} className="grid gap-4">
           <section className="panel p-5">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold">Seu perfil</h2>
                 <p className="muted mt-1 text-sm">Esses dados aparecem como referência no painel.</p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
+              <div className="panel-inner px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">
                 <div className="font-semibold">Conta</div>
-                <div className="mt-1">{user.email ?? ""}</div>
+                <div className="mt-1 break-all">{user.email ?? ""}</div>
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
               <label className="grid gap-2">
                 <span className="text-sm font-semibold">Nome do diretor</span>
                 <input name="full_name" defaultValue={profile.full_name ?? ""} className="input" />
               </label>
 
               <label className="grid gap-2">
-                <span className="text-sm font-semibold">E-mail</span>
+                <span className="text-sm font-semibold">E-mail atual</span>
                 <input value={user.email ?? ""} readOnly className="input opacity-80" />
               </label>
+            </div>
+
+            <div className="mt-4 panel-inner p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Trocar e-mail</div>
+                  <p className="muted mt-1 text-sm">
+                    A troca precisa de confirmação via e-mail. Enquanto isso, seu e-mail atual continua valendo.
+                  </p>
+                  {pendingEmail ? (
+                    <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      Pendente: <span className="font-semibold">{pendingEmail}</span>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Novo e-mail</span>
+                  <input
+                    name="new_email"
+                    type="email"
+                    placeholder="seu-novo@email.com"
+                    defaultValue={pendingEmail ?? ""}
+                    className="input"
+                  />
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" formAction={requestEmailChangeAction} className="btn btn-secondary">
+                    Solicitar troca
+                  </button>
+
+                  <input type="hidden" name="pending_email" value={pendingEmail ?? ""} />
+                  <button
+                    type="submit"
+                    formAction={resendEmailChangeAction}
+                    className="btn btn-ghost"
+                    disabled={!pendingEmail}
+                    title={!pendingEmail ? "Nenhuma troca pendente" : ""}
+                  >
+                    Reenviar confirmação
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -161,6 +381,16 @@ export default async function DirectorProfilePage({
                     <span className="text-xs font-semibold text-zinc-500">Sem logo</span>
                   )}
                 </div>
+
+                <button
+                  type="submit"
+                  formAction={removeLogoAction}
+                  className="btn btn-danger"
+                  disabled={!logoUrl}
+                  title={!logoUrl ? "Nenhuma logomarca enviada" : ""}
+                >
+                  Remover
+                </button>
               </div>
             </div>
 
@@ -175,11 +405,37 @@ export default async function DirectorProfilePage({
             </div>
           </section>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" className="btn btn-primary">
-              Salvar alterações
-            </button>
-            <p className="muted text-sm">As mudanças refletem no painel e nos relatórios.</p>
+          <section className="panel p-5">
+            <h2 className="text-lg font-semibold">Segurança</h2>
+            <p className="muted mt-1 text-sm">Troque sua senha sempre que precisar.</p>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Nova senha</span>
+                <input name="new_password" type="password" className="input" placeholder="••••••" />
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Confirmar nova senha</span>
+                <input name="new_password2" type="password" className="input" placeholder="••••••" />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-zinc-500">Mínimo de 6 caracteres.</p>
+              <button type="submit" formAction={updatePasswordAction} className="btn btn-secondary">
+                Alterar senha
+              </button>
+            </div>
+          </section>
+
+          <div className="panel p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="muted">As mudanças refletem no painel e nos relatórios.</p>
+              <button type="submit" className="btn btn-primary">
+                Salvar alterações
+              </button>
+            </div>
           </div>
         </form>
       </div>
