@@ -65,6 +65,26 @@ function fmtDatePtBr(isoDate: string) {
   return d.toLocaleDateString("pt-BR");
 }
 
+async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+  });
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data as T;
+}
+
+
 export function GradesByRoomClient() {
   const [shift, setShift] = useState("MANHA");
   const [data, setData] = useState<ApiResp | null>(null);
