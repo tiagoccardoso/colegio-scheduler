@@ -83,9 +83,20 @@ export async function GET(req: Request) {
 
     const teachers = teachersRaw;
 
+    // Para edição (modal) precisamos ao menos da lista de professores.
+    const editorTeachers = teachers
+      .map((t: any) => ({
+        id: String(t.id),
+        name: t?.name ?? null,
+        short_name: t?.short_name ?? null,
+        subject_id: (t as any)?.subject_id ?? null,
+        default_room_id: (t as any)?.default_room_id ?? null,
+      }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
     const byTeacher: Record<
       string,
-      { weekday: number; period_index: number | null; timeSlotId: string; notes: string | null }[]
+      { scheduleId: string; weekday: number; period_index: number | null; timeSlotId: string; notes: string | null }[]
     > = {};
 
     for (const r of haRows) {
@@ -96,6 +107,7 @@ export async function GET(req: Request) {
       if (!ts) continue;
       byTeacher[tid] ||= [];
       byTeacher[tid].push({
+        scheduleId: String(r.id),
         weekday: Number(ts.weekday),
         period_index: ts.period_index ?? null,
         timeSlotId: tsid,
@@ -122,6 +134,9 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       shift,
+      editor: {
+        teachers: editorTeachers,
+      },
       school: {
         name: (school as any)?.name ?? null,
       },

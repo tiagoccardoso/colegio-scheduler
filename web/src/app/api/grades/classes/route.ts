@@ -66,6 +66,37 @@ export async function GET(req: Request) {
     const subjectsById = new Map<string, any>(((subjectsRaw as any[]) ?? []).map((r) => [r.id, r]));
     const teachersById = new Map<string, any>(((teachersRaw as any[]) ?? []).map((r) => [r.id, r]));
 
+    const editorTeachers = ((teachersRaw as any[]) ?? [])
+      .map((t: any) => ({
+        id: String(t.id),
+        name: t?.name ?? null,
+        short_name: t?.short_name ?? null,
+        subject_id: t?.subject_id ?? null,
+        default_room_id: t?.default_room_id ?? null,
+      }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorClasses = classesAll
+      .filter((c: any) => {
+        const s = normalizeShift((c as any)?.shift);
+        return !s || s === shift;
+      })
+      .map((c: any) => ({
+        id: String(c.id),
+        name: (c as any)?.name ?? null,
+        shift: (c as any)?.shift ?? null,
+        default_room_id: (c as any)?.default_room_id ?? null,
+      }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorSubjects = ((subjectsRaw as any[]) ?? [])
+      .map((s: any) => ({ id: String(s.id), name: (s as any)?.name ?? null }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorRooms = ((roomsRaw as any[]) ?? [])
+      .map((r: any) => ({ id: String(r.id), name: (r as any)?.name ?? null }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
     // Sort classes by room number, display_order, then name
     classes.sort((a, b) => {
       const ra = roomsById.get((a as any).default_room_id);
@@ -104,8 +135,8 @@ export async function GET(req: Request) {
     let schedules: any[] = [];
     if (slotIds.length) {
       const sel = hasActivityType
-        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type"
-        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id";
+        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes"
+        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes";
 
       const res = await supabase
         .from("schedules")
@@ -117,7 +148,7 @@ export async function GET(req: Request) {
         // fallback p/ DB legado
         const legacy = await supabase
           .from("schedules")
-          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id")
+          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
           .eq("school_id", schoolId)
           .in("time_slot_id", slotIds);
         schedules = (legacy.data as any[]) ?? [];
@@ -160,9 +191,16 @@ export async function GET(req: Request) {
 
       grid[k] ||= {};
       grid[k][classId] = {
+        scheduleId: String(sc.id),
+        timeSlotId: String(sc.time_slot_id),
+        teacherId: String(sc.teacher_id ?? ""),
+        classId,
+        subjectId: String(sc.subject_id ?? ""),
+        roomId: effRoom ? String(effRoom) : null,
         subject: subjectLabel(subj),
         teacher: teacherLabel(teach),
         room: effRoom ? roomLabel(roomsById.get(effRoom)) : null,
+        notes: (sc as any)?.notes ?? null,
       };
     }
 
@@ -172,7 +210,14 @@ export async function GET(req: Request) {
         name: (school as any)?.name ?? null,
       },
       shift,
+      editor: {
+        teachers: editorTeachers,
+        classes: editorClasses,
+        subjects: editorSubjects,
+        rooms: editorRooms,
+      },
       timeSlots: timeSlots.map((t) => ({
+        id: t.id,
         weekday: t.weekday,
         period_index: t.period_index,
         starts_at: t.starts_at,

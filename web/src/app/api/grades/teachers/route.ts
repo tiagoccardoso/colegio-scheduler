@@ -96,6 +96,35 @@ export async function GET(req: Request) {
     const roomsById = new Map<string, any>(((roomsRaw as any[]) ?? []).map((r: any) => [String(r.id), r]));
     const subjectsById = new Map<string, any>(((subjectsRaw as any[]) ?? []).map((s: any) => [String(s.id), s]));
 
+    const editorTeachers = teachersAll.map((t: any) => ({
+      id: String(t.id),
+      name: (t as any)?.name ?? null,
+      short_name: (t as any)?.short_name ?? null,
+      subject_id: (t as any)?.subject_id ?? null,
+      default_room_id: (t as any)?.default_room_id ?? null,
+    }));
+
+    const editorClasses = classesAll
+      .filter((c: any) => {
+        const s = normalizeShift((c as any)?.shift);
+        return !s || s === shift;
+      })
+      .map((c: any) => ({
+        id: String(c.id),
+        name: (c as any)?.name ?? null,
+        shift: (c as any)?.shift ?? null,
+        default_room_id: (c as any)?.default_room_id ?? null,
+      }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorSubjects = ((subjectsRaw as any[]) ?? [])
+      .map((s: any) => ({ id: String(s.id), name: (s as any)?.name ?? null }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorRooms = ((roomsRaw as any[]) ?? [])
+      .map((r: any) => ({ id: String(r.id), name: (r as any)?.name ?? null }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
     // Detecta coluna activity_type (bases antigas podem não ter)
     let hasActivityType = true;
     {
@@ -156,6 +185,9 @@ export async function GET(req: Request) {
       const k = `${ts.weekday}-${ts.period_index ?? 0}`;
       if (isHa) {
         grid[k] = {
+          scheduleId: String(sc.id),
+          timeSlotId: String(sc.time_slot_id),
+          teacherId: String(sc.teacher_id),
           activityType: "HA",
           className: "Hora Atividade",
           subject: "Hora Atividade",
@@ -175,6 +207,12 @@ export async function GET(req: Request) {
       });
 
       grid[k] = {
+        scheduleId: String(sc.id),
+        timeSlotId: String(sc.time_slot_id),
+        teacherId: String(sc.teacher_id),
+        classId: classId,
+        subjectId: String(sc.subject_id ?? ""),
+        roomId: effRoom ? String(effRoom) : null,
         activityType: "AULA",
         className: (cls as any)?.name ?? "Turma",
         subject: subjectLabel(subj),
@@ -190,7 +228,14 @@ export async function GET(req: Request) {
       teacherId: teacherId || null,
       teacher: selectedTeacher ? { id: String((selectedTeacher as any).id), label: teacherLabel(selectedTeacher) } : null,
       teachers: teacherItems,
+      editor: {
+        teachers: editorTeachers,
+        classes: editorClasses,
+        subjects: editorSubjects,
+        rooms: editorRooms,
+      },
       timeSlots: timeSlots.map((t) => ({
+        id: t.id,
         weekday: t.weekday,
         period_index: t.period_index,
         starts_at: t.starts_at,

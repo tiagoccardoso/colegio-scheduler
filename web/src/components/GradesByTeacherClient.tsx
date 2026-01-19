@@ -2,6 +2,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  ScheduleEditorModal,
+  type ClassOption,
+  type RefOption,
+  type TeacherOption,
+  type TimeSlotInfo,
+} from "@/components/ScheduleEditorModal";
 
 type TeacherItem = { id: string; label: string };
 
@@ -12,16 +19,29 @@ type ApiResp = {
   teacher?: TeacherItem | null;
   teachers: TeacherItem[];
   school?: { name: string | null };
-  timeSlots: { weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
+  editor: {
+    teachers: TeacherOption[];
+    classes: ClassOption[];
+    subjects: RefOption[];
+    rooms: RefOption[];
+  };
+  timeSlots: { id: string; weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
   grid: Record<
     string,
-    {
-      activityType: "AULA" | "HA" | string;
-      className: string;
-      subject: string;
-      room: string | null;
-      notes?: string | null;
-    }
+    | {
+        scheduleId?: string;
+        timeSlotId: string;
+        teacherId: string;
+        activityType: "AULA" | "HA" | string;
+        classId?: string | null;
+        subjectId?: string | null;
+        roomId?: string | null;
+        className: string;
+        subject: string;
+        room: string | null;
+        notes?: string | null;
+      }
+    | null
   >;
 };
 
@@ -41,11 +61,62 @@ function fmtTime(v: string | null) {
   return String(v).slice(0, 5);
 }
 
+function todayIsoLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDatePtBr(isoDate: string) {
+  if (!isoDate) return "";
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString("pt-BR");
+}
+
+async function apiJson<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(init?.headers || {}),
+      },
+    });
+    const json = (await res.json()) as any;
+    if (!res.ok) return { ok: false, error: json?.error || res.statusText };
+    return { ok: true, data: json as T };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Erro de rede" };
+  }
+}
+
 export function GradesByTeacherClient() {
   const [shift, setShift] = useState("MANHA");
   const [teacherId, setTeacherId] = useState<string>("");
   const [data, setData] = useState<ApiResp | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reportDate, setReportDate] = useState<string>(todayIsoLocal());
+  const [nonce, setNonce] = useState(0);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [editing, setEditing] = useState<
+    | null
+    | {
+        scheduleId?: string | null;
+        slot: TimeSlotInfo;
+        defaults: {
+          activityType: "AULA" | "HA";
+          teacherId: string;
+          classId: string;
+          subjectId: string;
+          roomId: string;
+          notes: string;
+        };
+      }
+  >(null);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -63,7 +134,23 @@ export function GradesByTeacherClient() {
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shift, teacherId]);
+  }, [shift, teacherId, nonce]);
+
+  const slotByKey = useMemo(() => {
+    const m = new Map<string, TimeSlotInfo>();
+    for (const ts of data?.timeSlots || []) {
+      const p = ts.period_index;
+      if (!p) continue;
+      m.set(`${ts.weekday}-${p}`, {
+        id: ts.id,
+        weekday: ts.weekday,
+        period_index: ts.period_index,
+        starts_at: ts.starts_at,
+        ends_at: ts.ends_at,
+      });
+    }
+    return m;
+  }, [data?.timeSlots]);
 
   const periods = useMemo(() => {
     const set = new Set<number>();
@@ -91,6 +178,12 @@ export function GradesByTeacherClient() {
 
   return (
     <div>
+      {banner ? (
+        <div className="mb-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-800 shadow-sm dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-200 print:hidden">
+          {banner}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <select
           value={shift}
@@ -114,6 +207,16 @@ export function GradesByTeacherClient() {
           ))}
         </select>
 
+        <label className="flex items-center gap-2">
+          <span className="text-sm font-semibold">Data</span>
+          <input
+            type="date"
+            value={reportDate}
+            onChange={(e) => setReportDate(e.target.value)}
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-900 dark:bg-zinc-950"
+          />
+        </label>
+
         <button
           onClick={() => window.print()}
           className="ml-auto rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-950 dark:hover:bg-zinc-900"
@@ -129,6 +232,12 @@ export function GradesByTeacherClient() {
             <span className="font-semibold">Professor:</span> {selectedTeacherLabel || "—"}
             <span className="mx-2 text-zinc-400">•</span>
             <span className="font-semibold">Turno:</span> {shiftLabel(shift)}
+            {reportDate ? (
+              <>
+                <span className="mx-2 text-zinc-400">•</span>
+                <span className="font-semibold">Data:</span> {fmtDatePtBr(reportDate)}
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -164,10 +273,31 @@ export function GradesByTeacherClient() {
                       {time ? <div className="text-[11px] text-zinc-600 dark:text-zinc-400">{time}</div> : null}
                     </td>
                     {DAYS.map((d) => {
-                      const cell = data.grid?.[`${d}-${p}`];
+                      const key = `${d}-${p}`;
+                      const cell = data.grid?.[key];
                       const isHa = cell && String(cell.activityType || "").trim().toUpperCase() === "HA";
+                      const slot = slotByKey.get(key) || null;
                       return (
-                        <td key={d} className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16">
+                        <td
+                          key={d}
+                          className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                          onClick={() => {
+                            if (!slot) return;
+                            const defAct = isHa ? "HA" : "AULA";
+                            setEditing({
+                              scheduleId: (cell as any)?.scheduleId ?? null,
+                              slot,
+                              defaults: {
+                                activityType: defAct,
+                                teacherId: teacherId,
+                                classId: !isHa ? String((cell as any)?.classId ?? "") : "",
+                                subjectId: !isHa ? String((cell as any)?.subjectId ?? "") : "",
+                                roomId: !isHa ? String((cell as any)?.roomId ?? "") : "",
+                                notes: String((cell as any)?.notes ?? ""),
+                              },
+                            });
+                          }}
+                        >
                           {cell ? (
                             <div className="leading-tight">
                               {isHa ? (
@@ -200,6 +330,47 @@ export function GradesByTeacherClient() {
           </table>
         </div>
       )}
+
+      {editing && data?.editor ? (
+        <ScheduleEditorModal
+          open={Boolean(editing)}
+          scheduleId={editing.scheduleId ?? undefined}
+          slot={editing.slot}
+          teachers={data.editor.teachers}
+          classes={data.editor.classes}
+          subjects={data.editor.subjects}
+          rooms={data.editor.rooms}
+          lockTeacherId={teacherId}
+          defaults={editing.defaults}
+          onClose={() => setEditing(null)}
+          onSave={async (payload) => {
+            setBanner(null);
+            const r = await apiJson<any>("/api/weekly-grade/set", {
+              method: "POST",
+              body: JSON.stringify({ shift, ...payload }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setEditing(null);
+            setNonce((n) => n + 1);
+          }}
+          onDelete={async (sid) => {
+            setBanner(null);
+            const r = await apiJson<any>("/api/weekly-grade/delete", {
+              method: "POST",
+              body: JSON.stringify({ shift, scheduleId: sid }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setEditing(null);
+            setNonce((n) => n + 1);
+          }}
+        />
+      ) : null}
 
       <style jsx global>{`
         @media print {

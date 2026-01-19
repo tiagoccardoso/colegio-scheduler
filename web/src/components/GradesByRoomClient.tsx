@@ -1,24 +1,93 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  ScheduleEditorModal,
+  type ClassOption,
+  type RefOption,
+  type TeacherOption,
+  type TimeSlotInfo,
+} from "@/components/ScheduleEditorModal";
 
 type ApiResp = {
   ok: boolean;
   shift: string;
   school?: { name: string | null };
-  timeSlots: { weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
+  editor: {
+    teachers: TeacherOption[];
+    classes: ClassOption[];
+    subjects: RefOption[];
+    rooms: RefOption[];
+  };
+  timeSlots: { id: string; weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
   rooms: { id: string; header: string }[];
-  grid: Record<string, Record<string, { className: string; subject: string; teacher: string }>>;
+  grid: Record<
+    string,
+    Record<
+      string,
+      {
+        scheduleId?: string;
+        timeSlotId: string;
+        teacherId: string;
+        classId: string;
+        subjectId: string;
+        roomId: string;
+        notes?: string | null;
+        className: string;
+        subject: string;
+        teacher: string;
+      }
+    >
+  >;
 };
 
 const WEEKDAY = ["", "2ª FEIRA", "3ª FEIRA", "4ª FEIRA", "5ª FEIRA", "6ª FEIRA"];
 const DAYS = [1, 2, 3, 4, 5];
 
+function shiftLabel(v: string) {
+  const k = String(v || "").toUpperCase();
+  if (k === "MANHA") return "Manhã";
+  if (k === "TARDE") return "Tarde";
+  return "Noite";
+}
+
+function todayIsoLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDatePtBr(isoDate: string) {
+  if (!isoDate) return "";
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString("pt-BR");
+}
+
 export function GradesByRoomClient() {
   const [shift, setShift] = useState("MANHA");
   const [data, setData] = useState<ApiResp | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reportDate, setReportDate] = useState<string>(todayIsoLocal());
+  const [nonce, setNonce] = useState(0);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [editing, setEditing] = useState<
+    | null
+    | {
+        scheduleId?: string | null;
+        lockRoomId: string;
+        slot: TimeSlotInfo;
+        defaults: {
+          activityType: "AULA" | "HA";
+          teacherId: string;
+          classId: string;
+          subjectId: string;
+          roomId: string;
+          notes: string;
+        };
+      }
+  >(null);
 
   useEffect(() => {
     setLoading(true);
@@ -26,7 +95,23 @@ export function GradesByRoomClient() {
       .then((r) => r.json())
       .then((j) => setData(j))
       .finally(() => setLoading(false));
-  }, [shift]);
+  }, [shift, nonce]);
+
+  const slotByKey = useMemo(() => {
+    const m = new Map<string, TimeSlotInfo>();
+    for (const ts of data?.timeSlots || []) {
+      const p = ts.period_index;
+      if (!p) continue;
+      m.set(`${ts.weekday}-${p}`, {
+        id: ts.id,
+        weekday: ts.weekday,
+        period_index: ts.period_index,
+        starts_at: ts.starts_at,
+        ends_at: ts.ends_at,
+      });
+    }
+    return m;
+  }, [data?.timeSlots]);
 
   const perDay = useMemo(() => {
     const map: Record<number, number[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
@@ -40,12 +125,28 @@ export function GradesByRoomClient() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 print:hidden">
+      {banner ? (
+        <div className="mb-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-800 shadow-sm dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-200 print:hidden">
+          {banner}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <select value={shift} onChange={(e) => setShift(e.target.value)} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-900 dark:bg-zinc-950">
           <option value="MANHA">Manhã</option>
           <option value="TARDE">Tarde</option>
           <option value="NOITE">Noite</option>
         </select>
+
+        <label className="flex items-center gap-2">
+          <span className="text-sm font-semibold">Data</span>
+          <input
+            type="date"
+            value={reportDate}
+            onChange={(e) => setReportDate(e.target.value)}
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-900 dark:bg-zinc-950"
+          />
+        </label>
         <button onClick={() => window.print()} className="ml-auto rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-950 dark:hover:bg-zinc-900">
           Imprimir
         </button>
@@ -54,6 +155,15 @@ export function GradesByRoomClient() {
       {data?.school?.name && (
         <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:border-none print:shadow-none">
           <div className="font-semibold">{data?.school?.name ?? ""}</div>
+          <div className="mt-2 text-sm">
+            <span className="font-semibold">Turno:</span> {shiftLabel(shift)}
+            {reportDate ? (
+              <>
+                <span className="mx-2 text-zinc-400">•</span>
+                <span className="font-semibold">Data:</span> {fmtDatePtBr(reportDate)}
+              </>
+            ) : null}
+          </div>
         </div>
       )}
 
@@ -74,8 +184,8 @@ export function GradesByRoomClient() {
             </thead>
             <tbody>
               {DAYS.map((d) => (
-                <>
-                  <tr key={`day-${d}`}>
+                <Fragment key={`dayblock-${d}`}>
+                  <tr>
                     <td colSpan={1 + (data.rooms?.length || 0)} className="border border-zinc-200 bg-zinc-50 p-2 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-950 print:bg-zinc-50">
                       {WEEKDAY[d]}
                     </td>
@@ -86,9 +196,30 @@ export function GradesByRoomClient() {
                         {p}º
                       </td>
                       {data.rooms.map((r) => {
-                        const cell = data.grid?.[`${d}-${p}`]?.[r.id];
+                        const key = `${d}-${p}`;
+                        const cell = data.grid?.[key]?.[r.id];
+                        const slot = slotByKey.get(key) || null;
                         return (
-                          <td key={r.id} className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16">
+                          <td
+                            key={r.id}
+                            className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                            onClick={() => {
+                              if (!slot) return;
+                              setEditing({
+                                scheduleId: (cell as any)?.scheduleId ?? null,
+                                lockRoomId: r.id,
+                                slot,
+                                defaults: {
+                                  activityType: "AULA",
+                                  teacherId: String((cell as any)?.teacherId ?? ""),
+                                  classId: String((cell as any)?.classId ?? ""),
+                                  subjectId: String((cell as any)?.subjectId ?? ""),
+                                  roomId: r.id,
+                                  notes: String((cell as any)?.notes ?? ""),
+                                },
+                              });
+                            }}
+                          >
                             {cell ? (
                               <div className="leading-tight">
                                 <div className="font-semibold">{cell.className}</div>
@@ -102,12 +233,53 @@ export function GradesByRoomClient() {
                       })}
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {editing && data?.editor ? (
+        <ScheduleEditorModal
+          open={Boolean(editing)}
+          scheduleId={editing.scheduleId ?? undefined}
+          slot={editing.slot}
+          teachers={data.editor.teachers}
+          classes={data.editor.classes}
+          subjects={data.editor.subjects}
+          rooms={data.editor.rooms}
+          lockRoomId={editing.lockRoomId}
+          defaults={editing.defaults}
+          onClose={() => setEditing(null)}
+          onSave={async (payload) => {
+            setBanner(null);
+            const r = await apiJson<any>("/api/weekly-grade/set", {
+              method: "POST",
+              body: JSON.stringify({ shift, ...payload }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setEditing(null);
+            setNonce((n) => n + 1);
+          }}
+          onDelete={async (sid) => {
+            setBanner(null);
+            const r = await apiJson<any>("/api/weekly-grade/delete", {
+              method: "POST",
+              body: JSON.stringify({ shift, scheduleId: sid }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setEditing(null);
+            setNonce((n) => n + 1);
+          }}
+        />
+      ) : null}
 
       <style jsx global>{`
         @media print {

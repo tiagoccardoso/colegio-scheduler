@@ -73,6 +73,20 @@ function isoToShort(iso: string) {
   return d.toLocaleString();
 }
 
+function todayIsoLocal() {
+  const d = new Date();
+  // converte para data local (YYYY-MM-DD)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDatePtBr(isoDate: string) {
+  if (!isoDate) return "";
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString("pt-BR");
+}
+
 async function apiJson<T>(
   url: string,
   init?: RequestInit,
@@ -114,6 +128,7 @@ export function WeeklyGradeBoard(props: {
   const [schedules, setSchedules] = useState<ScheduleRow[]>(props.initialSchedules ?? []);
   const [events, setEvents] = useState<AuditEvent[]>(props.initialEvents ?? []);
   const [banner, setBanner] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const [reportDate, setReportDate] = useState<string>(todayIsoLocal());
   const [editing, setEditing] = useState<{
     open: boolean;
     teacherId: string;
@@ -316,6 +331,25 @@ export function WeeklyGradeBoard(props: {
     setEvents(r.data.events ?? []);
   }
 
+  async function clearHistory() {
+    const ok = confirm(
+      "Isso vai apagar o histórico de alterações (Undo/Redo) desta escola. Esta ação não pode ser desfeita. Deseja continuar?",
+    );
+    if (!ok) return;
+
+    const r = await apiJson<{ schedules: ScheduleRow[]; events: AuditEvent[] }>("/api/weekly-grade/clear-history", {
+      method: "POST",
+      body: JSON.stringify({ shift }),
+    });
+    if (!r.ok) {
+      setBanner({ kind: "error", text: r.error });
+      return;
+    }
+    setBanner({ kind: "info", text: "Histórico apagado." });
+    setSchedules(r.data.schedules ?? []);
+    setEvents(r.data.events ?? []);
+  }
+
   const editorModel = useMemo(() => {
     if (!editing) return null;
     const { teacherId, timeSlotId } = editing;
@@ -356,6 +390,16 @@ export function WeeklyGradeBoard(props: {
           </select>
         </label>
 
+        <label className="grid gap-2">
+          <span className="text-sm font-semibold">Data</span>
+          <input
+            type="date"
+            value={reportDate}
+            onChange={(e) => setReportDate(e.target.value)}
+            className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+          />
+        </label>
+
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -378,7 +422,8 @@ export function WeeklyGradeBoard(props: {
       <div className="hidden print:block">
         <div className="text-lg font-semibold">Grade semanal</div>
         <div className="text-sm text-zinc-600">
-          Turno: {shiftOptions.find((s) => s.key === shift)?.label || shift} • Gerado em: {new Date().toLocaleString()}
+          Turno: {shiftOptions.find((s) => s.key === shift)?.label || shift}
+          {reportDate ? ` • Data: ${fmtDatePtBr(reportDate)}` : ""} • Gerado em: {new Date().toLocaleString()}
         </div>
       </div>
 
@@ -564,6 +609,14 @@ export function WeeklyGradeBoard(props: {
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:hidden">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Histórico</h2>
+            <button
+              type="button"
+              onClick={() => void clearHistory()}
+              className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+              title="Deletar histórico"
+            >
+              Limpar
+            </button>
           </div>
           <div className="mt-3 grid gap-2">
             {events.map((ev) => {

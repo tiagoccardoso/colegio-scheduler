@@ -80,6 +80,33 @@ export async function GET(req: Request) {
     const subjectsById = new Map<string, any>(((subjectsRaw as any[]) ?? []).map((r) => [String((r as any).id), r]));
     const teachersById = new Map<string, any>(((teachersRaw as any[]) ?? []).map((r) => [String((r as any).id), r]));
 
+    const editorTeachers = ((teachersRaw as any[]) ?? [])
+      .map((t: any) => ({
+        id: String(t.id),
+        name: (t as any)?.name ?? null,
+        short_name: (t as any)?.short_name ?? null,
+        subject_id: (t as any)?.subject_id ?? null,
+        default_room_id: (t as any)?.default_room_id ?? null,
+      }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorClasses = classes
+      .map((c: any) => ({
+        id: String(c.id),
+        name: (c as any)?.name ?? null,
+        shift: (c as any)?.shift ?? null,
+        default_room_id: (c as any)?.default_room_id ?? null,
+      }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorSubjects = ((subjectsRaw as any[]) ?? [])
+      .map((s: any) => ({ id: String(s.id), name: (s as any)?.name ?? null }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
+    const editorRooms = rooms
+      .map((r: any) => ({ id: String(r.id), name: (r as any)?.name ?? null }))
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+
     const cols = rooms.map((r: any) => ({ id: String(r.id), header: roomLabel(r) }));
 
     // Detecta coluna activity_type (para evitar trazer HA no relatório)
@@ -92,8 +119,8 @@ export async function GET(req: Request) {
     let schedules: any[] = [];
     if (slotIds.length) {
       const sel = hasActivityType
-        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type"
-        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id";
+        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes"
+        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes";
 
       const res = await supabase
         .from("schedules")
@@ -147,6 +174,13 @@ export async function GET(req: Request) {
 
       grid[k] ||= {};
       grid[k][String(effRoom)] = {
+        scheduleId: String(sc.id),
+        timeSlotId: String(sc.time_slot_id),
+        teacherId: String(sc.teacher_id ?? ""),
+        classId: classId,
+        subjectId: String(sc.subject_id ?? ""),
+        roomId: String(effRoom),
+        notes: (sc as any)?.notes ?? null,
         className: (cls as any)?.name ?? "Turma",
         subject: subjectLabel(subj),
         teacher: teacherLabel(teach),
@@ -157,7 +191,14 @@ export async function GET(req: Request) {
       ok: true,
       school: { name: (school as any)?.name ?? null },
       shift,
+      editor: {
+        teachers: editorTeachers,
+        classes: editorClasses,
+        subjects: editorSubjects,
+        rooms: editorRooms,
+      },
       timeSlots: timeSlots.map((t) => ({
+        id: t.id,
         weekday: t.weekday,
         period_index: t.period_index,
         starts_at: t.starts_at,
