@@ -44,6 +44,8 @@ type AuditEvent = {
   created_at: string;
   undone_at: string | null;
   redone_at: string | null;
+  before?: any;
+  after?: any;
 };
 
 const WEEKDAYS: { key: number; label: string }[] = [
@@ -62,6 +64,10 @@ function fmtEvent(action: string) {
       return "Mover";
     case "delete":
       return "Excluir";
+    case "reset":
+      return "Zerar grade";
+    case "bulk_delete_ha":
+      return "Excluir HA em massa";
     default:
       return action;
   }
@@ -350,6 +356,25 @@ export function WeeklyGradeBoard(props: {
     setEvents(r.data.events ?? []);
   }
 
+  async function resetGrade() {
+    const ok = confirm(
+      "Isso vai zerar toda a grade semanal deste turno (Aulas + HA). Esta ação NÃO pode ser desfeita via Undo/Redo. Deseja continuar?",
+    );
+    if (!ok) return;
+
+    const r = await apiJson<{ schedules: ScheduleRow[]; events: AuditEvent[] }>("/api/weekly-grade/reset", {
+      method: "POST",
+      body: JSON.stringify({ shift, confirm: true }),
+    });
+    if (!r.ok) {
+      setBanner({ kind: "error", text: r.error });
+      return;
+    }
+    setBanner({ kind: "info", text: "Grade zerada." });
+    setSchedules(r.data.schedules ?? []);
+    setEvents(r.data.events ?? []);
+  }
+
   const editorModel = useMemo(() => {
     if (!editing) return null;
     const { teacherId, timeSlotId } = editing;
@@ -371,6 +396,80 @@ export function WeeklyGradeBoard(props: {
       },
     };
   }, [editing, schedules, teachers, timeSlots]);
+
+  const teacherById = useMemo(() => new Map(teachers.map((t) => [t.id, t.name || "(sem nome)"])), [teachers]);
+  const classById = useMemo(() => new Map(classes.map((c) => [c.id, c.name || ""])), [classes]);
+  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r.name || ""])), [rooms]);
+  const timeSlotById = useMemo(() => new Map(timeSlots.map((t) => [t.id, t])), [timeSlots]);
+
+  function labelForSlot(timeSlotId: string) {
+    const ts = timeSlotById.get(String(timeSlotId));
+    if (!ts) return "Slot";
+    const wd = WEEKDAYS.find((w) => w.key === ts.weekday)?.label || String(ts.weekday);
+    const p = ts.period_index ? `${ts.period_index}º` : "—";
+    const range = ts.starts_at && ts.ends_at ? `${ts.starts_at}–${ts.ends_at}` : "";
+    return `${wd} ${p}${range ? ` (${range})` : ""}`;
+  }
+
+  function normSnap(s: any) {
+    if (!s || typeof s !== "object") return null;
+    return {
+      id: String(s.id || ""),
+      teacher_id: String(s.teacher_id || ""),
+      time_slot_id: String(s.time_slot_id || ""),
+      activity_type: normActivityType(s.activity_type),
+      class_id: s.class_id ? String(s.class_id) : "",
+      subject_id: s.subject_id ? String(s.subject_id) : "",
+      room_id: s.room_id ? String(s.room_id) : "",
+      notes: s.notes ? String(s.notes) : "",
+    };
+  }
+
+  function snapTitle(s: any) {
+    const snap = normSnap(s);
+    if (!snap) return "";
+    const teacher = teacherById.get(snap.teacher_id) || "(sem professor)";
+    const slot = snap.time_slot_id ? labelForSlot(snap.time_slot_id) : "";
+    if (snap.activity_type === "HA") {
+      return `${teacher} • ${slot} • HA`;
+    }
+    const cls = snap.class_id ? classById.get(snap.class_id) || "" : "";
+    const subj = snap.subject_id ? subjectById.get(snap.subject_id) || "" : "";
+    const room = snap.room_id ? roomById.get(snap.room_id) || "" : "";
+    const extra = [cls, subj, room ? `Sala ${room}` : ""].filter(Boolean).join(" • ");
+    return `${teacher} • ${slot}${extra ? ` • ${extra}` : ""}`;
+  }
+
+  function diffSnap(before: any, after: any) {
+    const b = normSnap(before);
+    const a = normSnap(after);
+    if (!b && !a) return [] as string[];
+
+    // criação
+    if (!b && a) {
+      const notes = a.notes ? `Obs.: ${a.notes}` : "";
+      return ["Criado", notes].filter(Boolean);
+    }
+    // exclusão
+    if (b && !a) {
+      return ["Excluído"];
+    }
+    if (!b || !a) return [];
+
+    const changes: string[] = [];
+    if (b.teacher_id !== a.teacher_id)
+      changes.push(`Professor: ${teacherById.get(b.teacher_id) || "—"} → ${teacherById.get(a.teacher_id) || "—"}`);
+    if (b.time_slot_id !== a.time_slot_id) changes.push(`Horário: ${labelForSlot(b.time_slot_id)} → ${labelForSlot(a.time_slot_id)}`);
+    if (b.activity_type !== a.activity_type) changes.push(`Tipo: ${b.activity_type} → ${a.activity_type}`);
+    if (b.class_id !== a.class_id)
+      changes.push(`Turma: ${classById.get(b.class_id) || "—"} → ${classById.get(a.class_id) || "—"}`);
+    if (b.subject_id !== a.subject_id)
+      changes.push(`Disciplina: ${subjectById.get(b.subject_id) || "—"} → ${subjectById.get(a.subject_id) || "—"}`);
+    if (b.room_id !== a.room_id)
+      changes.push(`Sala: ${(roomById.get(b.room_id) || "—") || "—"} → ${(roomById.get(a.room_id) || "—") || "—"}`);
+    if ((b.notes || "") !== (a.notes || "")) changes.push(`Obs.: ${b.notes || "—"} → ${a.notes || "—"}`);
+    return changes;
+  }
 
   return (
     <div className="grid gap-4">
@@ -415,6 +514,15 @@ export function WeeklyGradeBoard(props: {
             className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
           >
             Imprimir
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void resetGrade()}
+            className="h-10 rounded-xl border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-800 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+            title="Zerar grade do turno"
+          >
+            Zerar grade
           </button>
         </div>
       </div>
@@ -621,6 +729,20 @@ export function WeeklyGradeBoard(props: {
           <div className="mt-3 grid gap-2">
             {events.map((ev) => {
               const undone = Boolean(ev.undone_at);
+              const before = (ev as any).before ?? null;
+              const after = (ev as any).after ?? null;
+              const bulk = Array.isArray(before) || Array.isArray(after);
+              const title = bulk
+                ? (() => {
+                    const cnt = Array.isArray(before) ? before.length : 0;
+                    if (String(ev.action) === "reset") return `Zerou a grade (${cnt} itens removidos)`;
+                    if (String(ev.action) === "bulk_delete_ha") return `Exclusão em massa de HA (${cnt} itens removidos)`;
+                    return `${fmtEvent(ev.action)} (${cnt} itens)`;
+                  })()
+                : snapTitle(after || before);
+
+              const changes = bulk ? [] : diffSnap(before, after);
+              const canUndoRedo = !bulk && String(ev.action) !== "reset" && String(ev.action) !== "bulk_delete_ha";
               return (
                 <div key={ev.id} className="rounded-xl border border-zinc-200 p-3 text-xs dark:border-zinc-800">
                   <div className="flex items-start justify-between gap-3">
@@ -629,25 +751,39 @@ export function WeeklyGradeBoard(props: {
                         {fmtEvent(ev.action)}
                         {undone ? " (desfeito)" : ""}
                       </div>
+                      <div className="text-[11px] text-zinc-700 dark:text-zinc-200">{title}</div>
+                      {changes.length ? (
+                        <ul className="mt-1 list-disc pl-4 text-[11px] text-zinc-600 dark:text-zinc-400">
+                          {changes.map((c, i) => (
+                            <li key={`${ev.id}-c-${i}`}>{c}</li>
+                          ))}
+                        </ul>
+                      ) : null}
                       <div className="text-[11px] text-zinc-500 dark:text-zinc-400">{isoToShort(ev.created_at)}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {undone ? (
-                        <button
-                          type="button"
-                          onClick={() => void redo(ev.id)}
-                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                        >
-                          Redo
-                        </button>
+                      {canUndoRedo ? (
+                        undone ? (
+                          <button
+                            type="button"
+                            onClick={() => void redo(ev.id)}
+                            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                          >
+                            Redo
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void undo(ev.id)}
+                            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                          >
+                            Undo
+                          </button>
+                        )
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => void undo(ev.id)}
-                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                        >
-                          Undo
-                        </button>
+                        <span className="text-[11px] text-zinc-500" title="Ação em lote não suportada no Undo/Redo">
+                          —
+                        </span>
                       )}
                     </div>
                   </div>

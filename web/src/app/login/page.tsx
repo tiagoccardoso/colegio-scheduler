@@ -96,10 +96,10 @@ export default function LoginPage() {
         <section className="hidden lg:block">
           <div className="badge w-fit">Organização sem drama</div>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Colégio
+            ClassFlow
           </h1>
           <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
-            Um painel leve para cadastrar base (turmas, horários, salas, professores) e montar a grade com mais clareza.
+            Um painel leve para cadastrar (Disciplinas, Salas, Turmas, Horários, Professores) e montar a grade com mais clareza.
           </p>
 
           <ul className="mt-6 grid gap-3">

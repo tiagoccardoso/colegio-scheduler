@@ -110,22 +110,34 @@ export function GradesHaClient() {
       }
   >(null);
 
+  const [adding, setAdding] = useState<null | {
+    open: boolean;
+    shift: string;
+    teacherId: string;
+    timeSlotId: string;
+    notes: string;
+  }>(null);
+
+  async function loadData(targetShift: string) {
+    if (targetShift === "ALL") {
+      const [m, t, n] = await Promise.all([
+        fetch(`/api/grades/ha?shift=MANHA`).then((r) => r.json()),
+        fetch(`/api/grades/ha?shift=TARDE`).then((r) => r.json()),
+        fetch(`/api/grades/ha?shift=NOITE`).then((r) => r.json()),
+      ]);
+      setDatasets([m as ApiResp, t as ApiResp, n as ApiResp]);
+    } else {
+      const d = (await fetch(`/api/grades/ha?shift=${targetShift}`).then((r) => r.json())) as ApiResp;
+      setDatasets([d]);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        if (shift === "ALL") {
-          const [m, t, n] = await Promise.all([
-            fetch(`/api/grades/ha?shift=MANHA`).then((r) => r.json()),
-            fetch(`/api/grades/ha?shift=TARDE`).then((r) => r.json()),
-            fetch(`/api/grades/ha?shift=NOITE`).then((r) => r.json()),
-          ]);
-          if (!cancelled) setDatasets([m as ApiResp, t as ApiResp, n as ApiResp]);
-        } else {
-          const d = (await fetch(`/api/grades/ha?shift=${shift}`).then((r) => r.json())) as ApiResp;
-          if (!cancelled) setDatasets([d]);
-        }
+        if (!cancelled) await loadData(shift);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -134,6 +146,34 @@ export function GradesHaClient() {
       cancelled = true;
     };
   }, [shift]);
+
+  const timeSlotOptionsByShift = useMemo(() => {
+    const out: Record<string, { id: string; label: string }[]> = {};
+    for (const d of datasets || []) {
+      if (!d?.ok) continue;
+      const key = String(d.shift).toUpperCase();
+      const opts: { id: string; label: string }[] = [];
+      for (const ts of d.timeSlots || []) {
+        if (!ts?.id) continue;
+        const wdLabel = WEEKDAYS[Number(ts.weekday)] ?? "—";
+        const p = Number(ts.period_index ?? 0);
+        const time = ts.starts_at && ts.ends_at ? `${fmtTime(ts.starts_at)}–${fmtTime(ts.ends_at)}` : "";
+        opts.push({ id: String(ts.id), label: `${wdLabel} • ${p ? `${p}º` : "—"}${time ? ` (${time})` : ""}` });
+      }
+      opts.sort((a, b) => a.label.localeCompare(b.label));
+      out[key] = opts;
+    }
+    return out;
+  }, [datasets]);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      await loadData(shift);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const header = useMemo(() => {
     const first = datasets?.find((d) => d?.ok) ?? datasets?.[0];
@@ -252,8 +292,49 @@ export function GradesHaClient() {
         </label>
 
         <button
-          onClick={() => window.print()}
+          onClick={() => {
+            setBanner(null);
+            setAdding({
+              open: true,
+              shift: shift === "ALL" ? "MANHA" : shift,
+              teacherId: "",
+              timeSlotId: "",
+              notes: "",
+            });
+          }}
           className="ml-auto rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+        >
+          Incluir
+        </button>
+
+        <button
+          onClick={async () => {
+            const ok = confirm(
+              shift === "ALL"
+                ? "Isso vai excluir TODAS as Horas Atividade (HA) de todos os turnos. Deseja continuar?"
+                : `Isso vai excluir TODAS as Horas Atividade (HA) do turno ${shiftLabel(shift)}. Deseja continuar?`,
+            );
+            if (!ok) return;
+            setBanner(null);
+            const r = await apiJson<{ ok: boolean }>("/api/grades/ha/delete", {
+              method: "POST",
+              body: JSON.stringify({ shift, confirm: true }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setBanner("Horas Atividade excluídas.");
+            await reload();
+          }}
+          className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+        >
+          Excluir tudo
+        </button>
+
+        <button
+          onClick={() => window.print()}
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-950 dark:hover:bg-zinc-900"
         >
           Imprimir
         </button>
@@ -293,6 +374,7 @@ export function GradesHaClient() {
                 <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100 w-20">Período</th>
                 <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100">Horário</th>
                 <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100">Obs.</th>
+                <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100 w-24 print:hidden">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -319,13 +401,42 @@ export function GradesHaClient() {
                     <td className="border border-zinc-200 p-2 text-center text-xs dark:border-zinc-800">{r.period_index}º</td>
                     <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">{time || "—"}</td>
                     <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">{r.notes || "—"}</td>
+                    <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800 print:hidden">
+                      {r.scheduleId ? (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const ok = confirm("Excluir esta Hora Atividade?");
+                            if (!ok) return;
+                            setBanner(null);
+                            const del = await apiJson<any>("/api/weekly-grade/delete", {
+                              method: "POST",
+                              body: JSON.stringify({ shift: r.shift, scheduleId: r.scheduleId }),
+                            });
+                            if (!del.ok) {
+                              setBanner(del.error);
+                              return;
+                            }
+                            setBanner("Hora Atividade excluída.");
+                            await reload();
+                          }}
+                          className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-800 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+                        >
+                          Excluir
+                        </button>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
 
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="border border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+                  <td colSpan={7} className="border border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
                     Nenhuma Hora Atividade cadastrada.
                   </td>
                 </tr>
@@ -373,23 +484,7 @@ export function GradesHaClient() {
               return;
             }
             setEditing(null);
-            // recarrega datasets
-            setLoading(true);
-            try {
-              if (shift === "ALL") {
-                const [m, t, n] = await Promise.all([
-                  fetch(`/api/grades/ha?shift=MANHA`).then((r) => r.json()),
-                  fetch(`/api/grades/ha?shift=TARDE`).then((r) => r.json()),
-                  fetch(`/api/grades/ha?shift=NOITE`).then((r) => r.json()),
-                ]);
-                setDatasets([m as ApiResp, t as ApiResp, n as ApiResp]);
-              } else {
-                const d = (await fetch(`/api/grades/ha?shift=${shift}`).then((r) => r.json())) as ApiResp;
-                setDatasets([d]);
-              }
-            } finally {
-              setLoading(false);
-            }
+            await reload();
           }}
           onDelete={async (sid) => {
             setBanner(null);
@@ -402,24 +497,129 @@ export function GradesHaClient() {
               return;
             }
             setEditing(null);
-            setLoading(true);
-            try {
-              if (shift === "ALL") {
-                const [m, t, n] = await Promise.all([
-                  fetch(`/api/grades/ha?shift=MANHA`).then((r) => r.json()),
-                  fetch(`/api/grades/ha?shift=TARDE`).then((r) => r.json()),
-                  fetch(`/api/grades/ha?shift=NOITE`).then((r) => r.json()),
-                ]);
-                setDatasets([m as ApiResp, t as ApiResp, n as ApiResp]);
-              } else {
-                const d = (await fetch(`/api/grades/ha?shift=${shift}`).then((r) => r.json())) as ApiResp;
-                setDatasets([d]);
-              }
-            } finally {
-              setLoading(false);
-            }
+            await reload();
           }}
         />
+      ) : null}
+
+      {adding?.open ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center print:hidden">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-950">
+            <div className="flex items-start justify-between gap-3">
+              <div className="grid gap-1">
+                <h3 className="text-base font-semibold">Incluir Hora Atividade</h3>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">Cadastre uma HA para diretor/professor diretamente no relatório.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdding(null)}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Turno</span>
+                <select
+                  value={adding.shift}
+                  onChange={(e) => setAdding((a) => (a ? { ...a, shift: e.target.value } : a))}
+                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                >
+                  <option value="MANHA">Manhã</option>
+                  <option value="TARDE">Tarde</option>
+                  <option value="NOITE">Noite</option>
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Professor/Diretor</span>
+                <select
+                  value={adding.teacherId}
+                  onChange={(e) => setAdding((a) => (a ? { ...a, teacherId: e.target.value } : a))}
+                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                >
+                  <option value="">Selecione...</option>
+                  {header.teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {String(t.short_name ?? "").trim() || String(t.name ?? "").trim() || "(sem nome)"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Horário (dia/período)</span>
+                <select
+                  value={adding.timeSlotId}
+                  onChange={(e) => setAdding((a) => (a ? { ...a, timeSlotId: e.target.value } : a))}
+                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                >
+                  <option value="">Selecione...</option>
+                  {(timeSlotOptionsByShift[String(adding.shift).toUpperCase()] || []).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">Observação (opcional)</span>
+                <textarea
+                  value={adding.notes}
+                  onChange={(e) => setAdding((a) => (a ? { ...a, notes: e.target.value } : a))}
+                  rows={3}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                />
+              </label>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAdding(null)}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!adding.teacherId || !adding.timeSlotId}
+                  onClick={async () => {
+                    setBanner(null);
+                    const r = await apiJson<any>("/api/weekly-grade/set", {
+                      method: "POST",
+                      body: JSON.stringify({
+                        shift: adding.shift,
+                        teacherId: adding.teacherId,
+                        timeSlotId: adding.timeSlotId,
+                        activityType: "HA",
+                        roomId: null,
+                        notes: adding.notes || null,
+                      }),
+                    });
+                    if (!r.ok) {
+                      setBanner(r.error);
+                      return;
+                    }
+                    setAdding(null);
+                    setBanner("Hora Atividade cadastrada.");
+                    await reload();
+                  }}
+                  className={
+                    "rounded-xl px-3 py-2 text-sm font-semibold " +
+                    (!adding.teacherId || !adding.timeSlotId
+                      ? "bg-zinc-200 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-500"
+                      : "border border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900")
+                  }
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

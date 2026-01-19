@@ -51,7 +51,7 @@ export async function getState(args: { supabase: any; schoolId: string; shift: s
 
   const { data: events } = await supabase
     .from("schedule_audit_events")
-    .select("id,action,created_at,undone_at,redone_at")
+    .select("id,action,created_at,undone_at,redone_at,before,after")
     .eq("school_id", schoolId)
     .order("created_at", { ascending: false })
     .limit(20);

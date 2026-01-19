@@ -43,6 +43,8 @@ type AuditEvent = {
   created_at: string;
   undone_at: string | null;
   redone_at: string | null;
+  before?: any;
+  after?: any;
 };
 
 const SHIFT_OPTIONS: { key: string; label: string }[] = [
@@ -133,7 +135,7 @@ export default async function Page({
 
   const { data: events } = await supabase
     .from("schedule_audit_events")
-    .select("id,action,created_at,undone_at,redone_at")
+    .select("id,action,created_at,undone_at,redone_at,before,after")
     .eq("school_id", profile.school_id)
     .order("created_at", { ascending: false })
     .limit(20);

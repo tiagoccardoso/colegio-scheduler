@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
   const { data: ev, error } = await supabase
     .from("schedule_audit_events")
-    .select("id,school_id,before,after,undone_at")
+    .select("id,school_id,action,before,after,undone_at")
     .eq("id", eventId)
     .eq("school_id", profile.school_id)
     .maybeSingle();
@@ -48,8 +48,13 @@ export async function POST(req: Request) {
   if (error || !ev) return jsonError("Evento não encontrado.");
   if (ev.undone_at) return jsonError("Este evento já foi desfeito.");
 
+  // Ações em lote (ex: reset / exclusão em massa) não suportam Undo/Redo por segurança
+  const action = String((ev as any).action || "").trim().toLowerCase();
   const before = (ev.before as any) ?? null;
   const after = (ev.after as any) ?? null;
+  if (action === "reset" || Array.isArray(before) || Array.isArray(after)) {
+    return jsonError("Este evento não suporta Undo.");
+  }
 
   // Undo: transiciona do estado "after" -> "before"
   const fromSnap = after;
