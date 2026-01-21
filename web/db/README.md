@@ -1,5 +1,14 @@
 # Banco de dados
 
+## Cadastro (Onboarding) — RLS de `profiles`
+
+Se ao concluir o cadastro aparecer o erro:
+
+> `new row violates row-level security policy for table "profiles"`
+
+rode o script `patch_profiles_rls.sql` no Supabase (SQL Editor). Ele cria as policies
+necessárias para o usuário autenticado **inserir/ler/atualizar** o próprio perfil.
+
 ## Evitar conflitos de grade
 
 Rode o script `schedules_constraints.sql` no Supabase (SQL Editor). Ele cria índices únicos que impedem:

@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/require-auth";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { encodeMsg, decodeMsg } from "@/lib/flash";
+import { getNavSections } from "@/components/nav";
 
 export default async function Page({
   searchParams,
@@ -43,11 +44,17 @@ export default async function Page({
     if (error) redirect("/onboarding?error=" + encodeMsg(error.message));
 
     revalidatePath("/dashboard");
-    redirect("/dashboard?msg=" + encodeMsg("Cadastro concluído!"));
+    redirect("/billing?msg=" + encodeMsg("Cadastro concluído! Agora ative sua assinatura."));
   }
 
   return (
-    <Shell title="Finalizar cadastro" subtitle="Crie o colégio e conclua seu perfil para usar o sistema">
+    <Shell
+      title="Finalizar cadastro"
+      subtitle="Crie o colégio e conclua seu perfil para usar o sistema"
+      isSubscribed={false}
+      navSections={getNavSections({ subscribed: false })}
+      homeHref="/onboarding"
+    >
       <div className="grid gap-4">
         {msg ? <Flash message={msg} variant="success" /> : null}
         {error ? <Flash message={error} variant="error" /> : null}

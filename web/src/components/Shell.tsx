@@ -4,16 +4,26 @@ import { MobileNav } from "@/components/MobileNav";
 import { NavLinks } from "@/components/NavLinks";
 import { SchoolLogoMark } from "@/components/SchoolLogoMark";
 import { SchoolNameLabel } from "@/components/SchoolNameLabel";
+import { NAV_SECTIONS, type NavSection } from "@/components/nav";
 
 export function Shell({
   title,
   subtitle,
   children,
+  isSubscribed = true,
+  navSections,
+  homeHref,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  isSubscribed?: boolean;
+  navSections?: NavSection[];
+  homeHref?: string;
 }) {
+  const safeHome = homeHref ?? (isSubscribed ? "/dashboard" : "/billing");
+  const resolvedNavSections = navSections ?? NAV_SECTIONS;
+  const hasMenu = (resolvedNavSections?.length ?? 0) > 0;
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 pt-4">
@@ -21,33 +31,50 @@ export function Shell({
           <div className="panel px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-3">
-                <Link href="/dashboard" className="shrink-0" aria-label="Ir para o dashboard">
+                <Link href={safeHome} className="shrink-0" aria-label="Ir para o início">
                   <SchoolLogoMark />
                 </Link>
 
                 <div className="leading-tight">
                   <Link
-                    href="/dashboard"
+                    href={safeHome}
                     className="block text-xs font-semibold tracking-wide text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
                   >
                     <SchoolNameLabel />
                   </Link>
                   <Link
-                    href="/director"
+                    href={isSubscribed ? "/director" : "/dashboard"}
                     className="block text-sm font-semibold text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
                   >
                     Painel do diretor
+                  </Link>
+
+                  <Link
+                    href="/billing"
+                    className={
+                      "mt-2 inline-flex w-fit items-center rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition " +
+                      (isSubscribed
+                        ? "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
+                        : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100")
+                    }
+                    title={isSubscribed ? "Gerenciar/cancelar assinatura" : "Finalizar assinatura"}
+                  >
+                    Assinaturas
                   </Link>
                 </div>
               </div>
 
               <div className="ml-auto flex items-center gap-2">
-                <div className="hidden lg:flex">
-                  <NavLinks variant="top" />
-                </div>
+                {hasMenu ? (
+                  <div className="hidden lg:flex">
+                    <NavLinks variant="top" sections={resolvedNavSections} isSubscribed={isSubscribed} />
+                  </div>
+                ) : null}
 
                 <LogoutButton />
-                <MobileNav />
+                {hasMenu ? (
+                  <MobileNav homeHref={safeHome} sections={resolvedNavSections} isSubscribed={isSubscribed} />
+                ) : null}
               </div>
             </div>
 

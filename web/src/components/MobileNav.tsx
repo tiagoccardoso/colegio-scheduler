@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavLinks } from "@/components/NavLinks";
 import { LogoutButton } from "@/components/LogoutButton";
+import type { NavSection } from "@/components/nav";
 
 function MenuIcon() {
   return (
@@ -22,9 +23,12 @@ function XIcon() {
   );
 }
 
-export function MobileNav() {
+export function MobileNav(
+  props: { homeHref?: string; sections?: NavSection[]; isSubscribed?: boolean } = {},
+) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const homeHref = props.homeHref ?? "/dashboard";
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -54,14 +58,14 @@ export function MobileNav() {
 
           <div className="absolute left-0 top-0 h-full w-[88%] max-w-[360px] overflow-y-auto rounded-r-3xl border-r border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
             <div className="flex items-center justify-between">
-              <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
+              <Link href={homeHref} className="text-sm font-semibold tracking-tight">
                 Colégio Scheduler
               </Link>
               <LogoutButton />
             </div>
 
             <div className="mt-4 panel p-2">
-              <NavLinks variant="sidebar" />
+              <NavLinks variant="sidebar" sections={props.sections} isSubscribed={props.isSubscribed} />
             </div>
 
             <p className="mt-8 text-xs text-zinc-500">MVP — Colégio Scheduler</p>

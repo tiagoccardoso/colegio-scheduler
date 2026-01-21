@@ -16,6 +16,67 @@ function Feature({ children }: { children: React.ReactNode }) {
   );
 }
 
+function PlanCards({ onPick }: { onPick: (plan: "monthly" | "yearly") => void }) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+      <div className="text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">
+        Plano de assinatura
+      </div>
+
+      <div className="mt-3">
+        <div className="text-base font-semibold">Planos</div>
+        <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+          Acesso completo ao gerador de grade, cadastros e relatórios.
+        </div>
+
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
+          <li>Cadastros ilimitados</li>
+          <li>Montagem de grade com revisão de conflitos</li>
+          <li>Relatórios</li>
+        </ul>
+
+        <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
+          A liberação do sistema acontece após a confirmação da assinatura (checkout Stripe).
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+            <div className="text-sm font-semibold">Mensal</div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight">
+              {process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal"}
+            </div>
+            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Pagamento recorrente mensal.</div>
+            <button
+              type="button"
+              onClick={() => onPick("monthly")}
+              className="btn btn-primary mt-4 w-full"
+            >
+              Assinar mensal
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+            <div className="text-sm font-semibold">Anual</div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight">
+              {process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual"}
+            </div>
+            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Pagamento recorrente anual.</div>
+            <button
+              type="button"
+              onClick={() => onPick("yearly")}
+              className="btn btn-primary mt-4 w-full"
+            >
+              Assinar anual
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs text-zinc-500">Você será direcionado para o checkout seguro do Stripe após entrar.</div>
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -32,6 +93,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [redirectAfterLogin, setRedirectAfterLogin] = useState("/dashboard");
+
+  function pickPlan(plan: "monthly" | "yearly") {
+    // Após entrar, o usuário cai no dashboard com o menu travado e os planos visíveis.
+    // A contratação em si acontece em /billing.
+    setRedirectAfterLogin(`/dashboard?plan=${plan}`);
+    setMode("login");
+    setInfoMsg(`Faça login para escolher e concluir a assinatura ${plan === "yearly" ? "anual" : "mensal"}.`);
+    setErrorMsg(null);
+    try {
+      document.getElementById("auth-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch {}
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,7 +126,7 @@ export default function LoginPage() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.replace("/dashboard");
+        router.replace(redirectAfterLogin);
         router.refresh();
         return;
       }
@@ -111,6 +185,11 @@ export default function LoginPage() {
           <p className="mt-8 text-sm text-zinc-600 dark:text-zinc-400">
             Dica nerd: mantenha o cadastro de horários consistente (início/fim) para deixar o motor de grade bem feliz.
           </p>
+
+          {/* Planos de assinatura — alinhados à esquerda (desktop) */}
+          <div className="mt-6">
+            <PlanCards onPick={pickPlan} />
+          </div>
         </section>
 
         <section className="panel p-6">
@@ -125,7 +204,12 @@ export default function LoginPage() {
             <div className="panel-inner flex items-center gap-1 p-1">
               <button
                 type="button"
-                onClick={() => setMode("login")}
+                onClick={() => {
+                  setMode("login");
+                  setRedirectAfterLogin("/dashboard");
+                  setInfoMsg(null);
+                  setErrorMsg(null);
+                }}
                 className={
                   "rounded-xl px-3 py-2 text-sm font-semibold transition " +
                   (mode === "login"
@@ -137,7 +221,12 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setMode("signup")}
+                onClick={() => {
+                  setMode("signup");
+                  setRedirectAfterLogin("/dashboard");
+                  setInfoMsg(null);
+                  setErrorMsg(null);
+                }}
                 className={
                   "rounded-xl px-3 py-2 text-sm font-semibold transition " +
                   (mode === "signup"
@@ -150,7 +239,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <form onSubmit={onSubmit} className="mt-5 grid gap-4">
+          <form id="auth-form" onSubmit={onSubmit} className="mt-5 grid gap-4">
             {errorMsg ? <Flash message={errorMsg} variant="error" /> : null}
             {infoMsg ? <Flash message={infoMsg} variant="success" /> : null}
 
@@ -226,6 +315,11 @@ export default function LoginPage() {
               Após criar a conta, finalize o cadastro (colégio) e então o sistema habilita as grades do seu colégio.
             </p>
           </form>
+
+          {/* Planos — versão mobile/tablet (a coluna da esquerda não aparece) */}
+          <div className="mt-6 lg:hidden">
+            <PlanCards onPick={pickPlan} />
+          </div>
         </section>
       </div>
     </div>
