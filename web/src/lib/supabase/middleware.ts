@@ -13,6 +13,10 @@ function isPublicPath(pathname: string) {
   // Billing
   if (pathname.startsWith("/billing")) return true;
 
+  // Ajuda (acessível mesmo sem assinatura ativa)
+  if (pathname.startsWith("/help")) return true;
+  if (pathname.startsWith("/api/ai/help")) return true;
+
   // Stripe webhook precisa ser público (chamado pelo Stripe)
   if (pathname.startsWith("/api/stripe/webhook")) return true;
 

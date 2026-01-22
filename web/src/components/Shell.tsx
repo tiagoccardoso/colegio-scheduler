@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
+import { HelpIconLink } from "@/components/HelpIconLink";
 import { MobileNav } from "@/components/MobileNav";
 import { NavLinks } from "@/components/NavLinks";
 import { SchoolLogoMark } from "@/components/SchoolLogoMark";
@@ -71,7 +72,10 @@ export function Shell({
                   </div>
                 ) : null}
 
-                <LogoutButton />
+                <div className="flex flex-col items-center gap-1">
+                  <HelpIconLink />
+                  <LogoutButton />
+                </div>
                 {hasMenu ? (
                   <MobileNav homeHref={safeHome} sections={resolvedNavSections} isSubscribed={isSubscribed} />
                 ) : null}

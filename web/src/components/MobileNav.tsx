@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavLinks } from "@/components/NavLinks";
 import { LogoutButton } from "@/components/LogoutButton";
+import { HelpIconLink } from "@/components/HelpIconLink";
 import type { NavSection } from "@/components/nav";
 
 function MenuIcon() {
@@ -61,7 +62,10 @@ export function MobileNav(
               <Link href={homeHref} className="text-sm font-semibold tracking-tight">
                 Colégio Scheduler
               </Link>
-              <LogoutButton />
+              <div className="flex flex-col items-end gap-1">
+                <HelpIconLink />
+                <LogoutButton />
+              </div>
             </div>
 
             <div className="mt-4 panel p-2">
