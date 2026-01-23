@@ -15,6 +15,9 @@ import {
   getOrCreateStripeCustomerId,
 } from "@/lib/billing";
 
+// Stripe Node SDK precisa do runtime Node.js.
+export const runtime = "nodejs";
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -63,29 +66,39 @@ export default async function BillingPage({
       );
     }
 
-    const stripeCustomerId = await getOrCreateStripeCustomerId({
-      supabase: supabase as any,
-      userId: user.id,
-      schoolId: profile.school_id,
-      email: user.email,
-      createCustomer: ({ email, metadata }) => stripe.customers.create({ email: email ?? undefined, metadata }),
-    });
+    let sessionUrl: string | null = null;
+    try {
+      const stripeCustomerId = await getOrCreateStripeCustomerId({
+        supabase: supabase as any,
+        userId: user.id,
+        schoolId: profile.school_id,
+        email: user.email,
+        createCustomer: ({ email, metadata }) => stripe.customers.create({ email: email ?? undefined, metadata }),
+      });
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      customer: stripeCustomerId,
-      line_items: [{ price: priceId, quantity: 1 }],
-      allow_promotion_codes: true,
-      success_url: `${origin}/billing/return?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/billing`,
-      subscription_data: {
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer: stripeCustomerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        allow_promotion_codes: true,
+        success_url: `${origin}/billing/return?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/billing`,
+        subscription_data: {
+          metadata: { user_id: user.id, school_id: profile.school_id },
+        },
         metadata: { user_id: user.id, school_id: profile.school_id },
-      },
-      metadata: { user_id: user.id, school_id: profile.school_id },
-    });
+      });
 
-    if (!session.url) redirect("/billing?error=" + encodeMsg("Não foi possível iniciar o checkout."));
-    redirect(session.url);
+      sessionUrl = session.url ?? null;
+    } catch (err: any) {
+      console.error("[billing] startCheckout failed", err);
+      // Evita explodir com um 500 (tela de digest) e devolve algo acionável.
+      const msg = String(err?.message ?? "Não foi possível iniciar o checkout.");
+      redirect("/billing?error=" + encodeMsg(msg));
+    }
+
+    if (!sessionUrl) redirect("/billing?error=" + encodeMsg("Não foi possível iniciar o checkout."));
+    redirect(sessionUrl);
   }
 
   async function openPortal() {
@@ -95,20 +108,30 @@ export default async function BillingPage({
     const h = await headers();
     const origin = h.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-    const stripeCustomerId = await getOrCreateStripeCustomerId({
-      supabase: supabase as any,
-      userId: user.id,
-      schoolId: profile.school_id,
-      email: user.email,
-      createCustomer: ({ email, metadata }) => stripe.customers.create({ email: email ?? undefined, metadata }),
-    });
+    let portalUrl: string | null = null;
+    try {
+      const stripeCustomerId = await getOrCreateStripeCustomerId({
+        supabase: supabase as any,
+        userId: user.id,
+        schoolId: profile.school_id,
+        email: user.email,
+        createCustomer: ({ email, metadata }) => stripe.customers.create({ email: email ?? undefined, metadata }),
+      });
 
-    const portal = await stripe.billingPortal.sessions.create({
-      customer: stripeCustomerId,
-      return_url: `${origin}/billing`,
-    });
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: `${origin}/billing`,
+      });
 
-    redirect(portal.url);
+      portalUrl = portal.url ?? null;
+    } catch (err: any) {
+      console.error("[billing] openPortal failed", err);
+      const msg = String(err?.message ?? "Não foi possível abrir o portal do Stripe.");
+      redirect("/billing?error=" + encodeMsg(msg));
+    }
+
+    if (!portalUrl) redirect("/billing?error=" + encodeMsg("Não foi possível abrir o portal do Stripe."));
+    redirect(portalUrl);
   }
 
   async function cancelSubscription() {
@@ -122,7 +145,13 @@ export default async function BillingPage({
       redirect("/billing?error=" + encodeMsg("Nenhuma assinatura encontrada para cancelar."));
     }
 
-    await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+    try {
+      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+    } catch (err: any) {
+      console.error("[billing] cancelSubscription failed", err);
+      const msg = String(err?.message ?? "Não foi possível solicitar o cancelamento.");
+      redirect("/billing?error=" + encodeMsg(msg));
+    }
     redirect(
       "/billing?msg=" +
         encodeMsg(
