@@ -3,15 +3,22 @@ import Link from "next/link";
 import { Shell } from "@/components/Shell";
 import { HelpChat } from "@/components/HelpChat";
 import { getNavSections } from "@/components/nav";
-import { requireDirector } from "@/lib/require-director";
-import { getSchoolSubscription, getUserAccessOverride, isSubscriptionActive, isUserOverrideActive } from "@/lib/billing";
+import { requireStaff } from "@/lib/require-staff";
+import { getEffectiveAccess } from "@/lib/billing";
 
 export default async function HelpPage() {
-  const { supabase, profile } = await requireDirector();
+  const { supabase, profile } = await requireStaff();
 
-  const sub = await getSchoolSubscription(supabase as any, profile.school_id);
-  const override = await getUserAccessOverride(supabase as any, profile.user_id);
-  const active = isSubscriptionActive(sub?.status) || isUserOverrideActive(override);
+  const access = await getEffectiveAccess({
+    supabase: supabase as any,
+    profile: {
+      user_id: profile.user_id,
+      school_id: profile.school_id,
+      role: profile.role as any,
+      full_name: profile.full_name,
+    },
+  });
+  const active = access.active;
   const navSections = getNavSections({ subscribed: active });
 
   return (

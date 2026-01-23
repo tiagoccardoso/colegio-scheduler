@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { HelpIconLink } from "@/components/HelpIconLink";
 import { MobileNav } from "@/components/MobileNav";
@@ -6,6 +9,7 @@ import { NavLinks } from "@/components/NavLinks";
 import { SchoolLogoMark } from "@/components/SchoolLogoMark";
 import { SchoolNameLabel } from "@/components/SchoolNameLabel";
 import { NAV_SECTIONS, type NavSection } from "@/components/nav";
+import { createClient } from "@/lib/supabase/client";
 
 export function Shell({
   title,
@@ -22,9 +26,43 @@ export function Shell({
   navSections?: NavSection[];
   homeHref?: string;
 }) {
-  const safeHome = homeHref ?? (isSubscribed ? "/dashboard" : "/billing");
-  const resolvedNavSections = navSections ?? NAV_SECTIONS;
-  const hasMenu = (resolvedNavSections?.length ?? 0) > 0;
+  const supabase = useMemo(() => createClient(), []);
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth.user;
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const r = String((profile as any)?.role || "").trim();
+        if (!cancelled) setRole(r || null);
+      } catch {
+        if (!cancelled) setRole(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  const isDirector = role === "director";
+  const safeHome =
+    homeHref ??
+    (isDirector ? (isSubscribed ? "/dashboard" : "/billing") : isSubscribed ? "/dashboard" : "/help");
+
+  const roleNavSections = navSections ?? NAV_SECTIONS;
+  const hasMenu = (roleNavSections?.length ?? 0) > 0;
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 pt-4">
@@ -44,31 +82,33 @@ export function Shell({
                     <SchoolNameLabel />
                   </Link>
                   <Link
-                    href={isSubscribed ? "/director" : "/dashboard"}
+                    href={isDirector ? "/director" : safeHome}
                     className="block text-sm font-semibold text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
                   >
-                    Painel do diretor
+                    {isDirector ? "Painel do diretor" : "Painel da equipe"}
                   </Link>
 
-                  <Link
-                    href="/billing"
-                    className={
-                      "mt-2 inline-flex w-fit items-center rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition " +
-                      (isSubscribed
-                        ? "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
-                        : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100")
-                    }
-                    title={isSubscribed ? "Gerenciar/cancelar assinatura" : "Finalizar assinatura"}
-                  >
-                    Assinaturas
-                  </Link>
+                  {isDirector ? (
+                    <Link
+                      href="/billing"
+                      className={
+                        "mt-2 inline-flex w-fit items-center rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition " +
+                        (isSubscribed
+                          ? "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
+                          : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100")
+                      }
+                      title={isSubscribed ? "Gerenciar/cancelar assinatura" : "Finalizar assinatura"}
+                    >
+                      Assinaturas
+                    </Link>
+                  ) : null}
                 </div>
               </div>
 
               <div className="ml-auto flex items-center gap-2">
                 {hasMenu ? (
                   <div className="hidden lg:flex">
-                    <NavLinks variant="top" sections={resolvedNavSections} isSubscribed={isSubscribed} />
+                    <NavLinks variant="top" sections={roleNavSections} isSubscribed={isSubscribed} />
                   </div>
                 ) : null}
 
@@ -77,7 +117,7 @@ export function Shell({
                   <LogoutButton />
                 </div>
                 {hasMenu ? (
-                  <MobileNav homeHref={safeHome} sections={resolvedNavSections} isSubscribed={isSubscribed} />
+                  <MobileNav homeHref={safeHome} sections={roleNavSections} isSubscribed={isSubscribed} />
                 ) : null}
               </div>
             </div>

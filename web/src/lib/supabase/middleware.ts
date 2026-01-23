@@ -1,6 +1,56 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+async function isDirectorCourtesyActive(params: { schoolId: string }) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return false;
+
+  const rest = `${url.replace(/\/$/, "")}/rest/v1`;
+
+  const headers: Record<string, string> = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    Accept: "application/json",
+  };
+
+  const schoolId = encodeURIComponent(params.schoolId);
+
+  // 1) Descobre o diretor da escola
+  const pRes = await fetch(
+    `${rest}/profiles?select=user_id&school_id=eq.${schoolId}&role=eq.director&limit=1`,
+    { headers },
+  );
+
+  if (!pRes.ok) return false;
+  const pJson = (await pRes.json()) as Array<{ user_id?: string }>;
+  const directorId = String(pJson?.[0]?.user_id ?? "").trim();
+  if (!directorId) return false;
+
+  // 2) Busca override do diretor (se a tabela existir)
+  const oRes = await fetch(
+    `${rest}/user_access_overrides?select=access_override,access_override_until&user_id=eq.${encodeURIComponent(
+      directorId,
+    )}&limit=1`,
+    { headers },
+  );
+
+  if (!oRes.ok) return false;
+  const oJson = (await oRes.json()) as Array<{
+    access_override?: string | null;
+    access_override_until?: string | null;
+  }>;
+
+  const override = oJson?.[0] ?? null;
+  if (!override) return false;
+  if (override.access_override !== "complimentary") return false;
+  if (!override.access_override_until) return true;
+
+  const until = new Date(String(override.access_override_until));
+  if (Number.isNaN(until.getTime())) return false;
+  return until.getTime() > Date.now();
+}
+
 function isPublicPath(pathname: string) {
   // Rotas que precisam funcionar sem assinatura (ou sem login)
   if (pathname === "/") return true;
@@ -10,8 +60,14 @@ function isPublicPath(pathname: string) {
   if (pathname.startsWith("/onboarding")) return true;
   if (pathname.startsWith("/forbidden")) return true;
 
+  // Dashboard deve abrir mesmo sem assinatura (mostra o sistema bloqueado e os planos)
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return true;
+
   // Billing
   if (pathname.startsWith("/billing")) return true;
+
+  // Painel do diretor deve abrir mesmo sem assinatura (o próprio painel já é restrito por role).
+  if (pathname.startsWith("/director")) return true;
 
   // Ajuda (acessível mesmo sem assinatura ativa)
   if (pathname.startsWith("/help")) return true;
@@ -110,6 +166,17 @@ export async function updateSession(request: NextRequest) {
     .maybeSingle();
 
   if (!overrideError && isCourtesyActive((override as any) ?? null)) return response;
+
+  // 4) Cortesia do diretor (por escola) — a equipe pedagógica herda a mesma liberação.
+  // Isso garante que, se o diretor estiver com acesso por cortesia (sem Stripe), a equipe também consiga usar o sistema.
+  if (String((profile as any)?.role) === "pedagogical") {
+    try {
+      const activeByDirector = await isDirectorCourtesyActive({ schoolId: String(profile.school_id) });
+      if (activeByDirector) return response;
+    } catch {
+      // Se falhar, seguimos o fluxo padrão (bloqueado)
+    }
+  }
 
   // API: devolve erro (sem redirect)
   if (pathname.startsWith("/api/")) {

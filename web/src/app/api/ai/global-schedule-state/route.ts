@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isStaffRole } from "@/lib/authz";
 
 function normalizeShift(v: any) {
   const key = String(v ?? "").trim().toUpperCase();
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
       .maybeSingle();
 
     if (!profile?.school_id) return NextResponse.json({ error: "Perfil não encontrado." }, { status: 400 });
-    if (profile.role !== "director") return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+    if (!isStaffRole((profile as any).role)) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
 
     const schoolId = profile.school_id;
 

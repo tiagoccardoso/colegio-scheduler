@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -23,7 +23,7 @@ const SHIFT_OPTIONS: { key: string; label: string }[] = [
 ];
 
 export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
-  const { supabase, profile } = await requireDirector();
+  const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
 
@@ -39,7 +39,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
   async function createAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const rawShift = String(formData.get("shift") || "").trim().toUpperCase();
     const payload: any = {
@@ -61,7 +61,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/classes?error=" + encodeMsg("ID inválido."));
@@ -89,7 +89,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/classes?error=" + encodeMsg("ID inválido."));

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isStaffRole } from "@/lib/authz";
 
 export const SHIFT_KEYS = ["MANHA", "TARDE", "NOITE"] as const;
 export type ShiftKey = (typeof SHIFT_KEYS)[number];
@@ -21,7 +22,7 @@ export async function requireDirectorApi() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (!profile || (profile as any).role !== "director") return null;
+  if (!profile || !isStaffRole((profile as any).role)) return null;
   return { supabase, user, profile: profile as any };
 }
 

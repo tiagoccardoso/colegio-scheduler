@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -51,7 +51,7 @@ export default async function Page({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const { supabase, profile } = await requireDirector();
+  const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
@@ -87,7 +87,7 @@ export default async function Page({
 
   async function createAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const weekday = Number(formData.get("weekday"));
     const shift = String(formData.get("shift") || "MANHA").trim().toUpperCase();
@@ -121,7 +121,7 @@ export default async function Page({
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     const weekday = Number(formData.get("weekday"));
@@ -152,7 +152,7 @@ export default async function Page({
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/time-slots?error=" + encodeMsg("ID inválido."));
@@ -170,7 +170,7 @@ export default async function Page({
 
   async function generateAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const shift = String(formData.get("g_shift") || "MANHA").trim().toUpperCase();
     const start = String(formData.get("g_start") || "07:00").trim();
@@ -280,7 +280,7 @@ export default async function Page({
 
   async function saveShiftIntervalAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const shift = String(formData.get("ss_shift") || "MANHA").trim().toUpperCase();
     const interval = Math.max(0, Math.min(180, Number(formData.get("ss_interval")) || 0));
@@ -309,7 +309,7 @@ export default async function Page({
 
   async function resetAllPeriodsAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const shift = String(formData.get("r_shift") || "ALL").trim().toUpperCase();
     const deleteSchedules = String(formData.get("r_delete_schedules") || "") === "on";
@@ -359,7 +359,7 @@ export default async function Page({
 
   async function createHoraAtividadeAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const teacherId = String(formData.get("ha_teacher") || "");
     const shift = String(formData.get("ha_shift") || "MANHA").trim().toUpperCase();

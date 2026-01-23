@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { NAV_SECTIONS, type NavSection } from "@/components/nav";
+import { createClient } from "@/lib/supabase/client";
 
 function LockIcon(props: { className?: string } = {}) {
   return (
@@ -28,6 +30,38 @@ export function NavLinks(
   const router = useRouter();
   const variant = props.variant ?? "top";
 
+  const supabase = useMemo(() => createClient(), []);
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth.user;
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const r = String((profile as any)?.role || "").trim();
+        if (!cancelled) setRole(r || null);
+      } catch {
+        if (!cancelled) setRole(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  const isDirector = role === "director";
+
   const sections = props.sections ?? NAV_SECTIONS;
   const isSubscribed = props.isSubscribed ?? true;
 
@@ -36,7 +70,7 @@ export function NavLinks(
     .filter((s) => s.title !== "Relatórios")
     .flatMap((s) => s.items);
 
-  const goBilling = () => router.push("/billing");
+  const goBilling = () => router.push(isDirector ? "/billing" : "/help");
 
   const LinkItem = ({ href, label }: { href: string; label: string }) => {
     const active = pathname === href;

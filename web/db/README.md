@@ -55,3 +55,21 @@ Quando houver matriz configurada para uma turma, a geração automática passa a
 Rode o script `shift_settings.sql` para criar a tabela `shift_settings`, que guarda o **intervalo (minutos)** entre períodos por **turno**.
 
 A tela **Horários** pode usar esse valor durante a geração automática do calendário.
+
+## Equipe pedagógica (acessos)
+
+Rode o script `pedagogical_team.sql` para criar a tabela `public.pedagogical_team`.
+
+Essa tabela guarda, por escola, a lista de usuários cadastrados como **equipe pedagógica** (user_id + school_id + nome),
+com RLS permitindo que **diretores** gerenciem a equipe. A autorização de acesso no app continua baseada em `public.profiles.role`
+(com valor `pedagogical`).
+
+## Equipe pedagógica — liberar role em `profiles`
+
+Se ao cadastrar um usuário na tela **Equipe pedagógica** aparecer o erro:
+
+> `new row for relation "profiles" violates check constraint "profiles_role_check"`
+
+rode o script `patch_profiles_role_check.sql` no Supabase (SQL Editor).
+Ele atualiza a constraint/enum de `public.profiles.role` para aceitar o valor `pedagogical`.
+

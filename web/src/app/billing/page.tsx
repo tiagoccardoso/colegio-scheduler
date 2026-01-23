@@ -4,11 +4,10 @@ import { headers } from "next/headers";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { getNavSections } from "@/components/nav";
-import { requireAuth } from "@/lib/require-auth";
+import { requireDirector } from "@/lib/require-director";
 import { decodeMsg, encodeMsg } from "@/lib/flash";
 import { stripe } from "@/lib/stripe";
 import {
-  getProfile,
   getSchoolSubscription,
   getUserAccessOverride,
   isSubscriptionActive,
@@ -21,7 +20,7 @@ export default async function BillingPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { supabase, user } = await requireAuth();
+  const { supabase, user, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};
 
   const selectedPlan = ((): "monthly" | "yearly" => {
@@ -32,8 +31,6 @@ export default async function BillingPage({
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
-  const profile = await getProfile(supabase as any, user.id);
-  if (!profile?.school_id) redirect("/onboarding");
 
   const sub = await getSchoolSubscription(supabase as any, profile.school_id);
   const paidActive = isSubscriptionActive(sub?.status);
@@ -46,13 +43,7 @@ export default async function BillingPage({
 
   async function startCheckout(formData: FormData) {
     "use server";
-    const { supabase, user } = await requireAuth();
-    const profile = await getProfile(supabase as any, user.id);
-    if (!profile?.school_id) redirect("/onboarding");
-
-    if (profile.role !== "director") {
-      redirect("/billing?error=" + encodeMsg("Apenas o diretor pode contratar um plano."));
-    }
+    const { supabase, user, profile } = await requireDirector();
 
     const h = await headers();
     const origin = h.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -99,9 +90,7 @@ export default async function BillingPage({
 
   async function openPortal() {
     "use server";
-    const { supabase, user } = await requireAuth();
-    const profile = await getProfile(supabase as any, user.id);
-    if (!profile?.school_id) redirect("/onboarding");
+    const { supabase, user, profile } = await requireDirector();
 
     const h = await headers();
     const origin = h.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -124,13 +113,7 @@ export default async function BillingPage({
 
   async function cancelSubscription() {
     "use server";
-    const { supabase, user } = await requireAuth();
-    const profile = await getProfile(supabase as any, user.id);
-    if (!profile?.school_id) redirect("/onboarding");
-
-    if (profile.role !== "director") {
-      redirect("/billing?error=" + encodeMsg("Apenas o diretor pode cancelar o plano."));
-    }
+    const { supabase, user, profile } = await requireDirector();
 
     const sub = await getSchoolSubscription(supabase as any, profile.school_id);
     const subscriptionId = sub?.stripe_subscription_id;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isStaffRole } from "@/lib/authz";
 
 type ReqBody = {
   classId: string;
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
       .select("school_id, role")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!profile || (profile as any).role !== "director") {
+    if (!profile || !isStaffRole((profile as any).role)) {
       return NextResponse.json({ error: "Apenas diretor pode usar esta função." }, { status: 403 });
     }
     const schoolId = String((profile as any).school_id);

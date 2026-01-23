@@ -1,4 +1,4 @@
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { ScheduleGeneralClient } from "@/components/ScheduleGeneralClient";
 
@@ -10,7 +10,7 @@ export default async function Page({
   // Next.js 16 pode tipar searchParams como Promise nos types gerados.
   searchParams?: Promise<SearchParams>;
 }) {
-  await requireDirector();
+  await requireStaff();
 
   const sp = (await searchParams) ?? {};
   const classId = typeof sp?.classId === "string" ? sp.classId : null;

@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -45,7 +45,7 @@ export default async function Page({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const { supabase, profile } = await requireDirector();
+  const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
   // Usado por telas auxiliares (ex.: Conflitos) para abrir direto o professor.
@@ -96,7 +96,7 @@ export default async function Page({
 
   async function createAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const parsedRules = parseTeachingRulesJson(formData.get("teaching_rules_json"));
     if (parsedRules.length === 0) {
@@ -136,7 +136,7 @@ export default async function Page({
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/teachers?error=" + encodeMsg("ID inválido."));
@@ -178,7 +178,7 @@ export default async function Page({
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/teachers?error=" + encodeMsg("ID inválido."));

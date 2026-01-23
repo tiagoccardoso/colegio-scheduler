@@ -1,10 +1,10 @@
 
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { GradesByRoomClient } from "@/components/GradesByRoomClient";
 
 export default async function Page() {
-  await requireDirector();
+  await requireStaff();
   return (
     <Shell title="Grade por sala" subtitle="Impressão no formato do quadro (colunas por sala)">
       <GradesByRoomClient />

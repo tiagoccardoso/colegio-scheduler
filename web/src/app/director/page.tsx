@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import Link from "next/link";
 
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
@@ -277,6 +278,21 @@ export default async function DirectorProfilePage({
       <div className="grid gap-4">
         {msg ? <Flash message={msg} variant="success" /> : null}
         {error ? <Flash message={error} variant="error" /> : null}
+
+        <section className="panel p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Equipe pedagógica</h2>
+              <p className="muted mt-1 text-sm">
+                Cadastre pessoas para acessar Cadastros e Relatórios. O acesso ao Painel do diretor e Assinaturas fica restrito ao seu login.
+              </p>
+            </div>
+
+            <Link href="/director/equipe-pedagogica" className="btn btn-primary">
+              Equipe pedagógica
+            </Link>
+          </div>
+        </section>
 
         <form action={saveAction} className="grid gap-4">
           <section className="panel p-5">

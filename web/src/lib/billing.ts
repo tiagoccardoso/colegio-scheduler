@@ -1,10 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type BillingProfile = {
   user_id: string;
   school_id: string;
-  role: "director" | "teacher";
+  role: "director" | "teacher" | "pedagogical";
   full_name: string | null;
 };
 
@@ -114,4 +115,97 @@ export async function getOrCreateStripeCustomerId(params: {
   if (error) throw new Error(error.message);
 
   return customer.id;
+}
+
+export type EffectiveAccess = {
+  active: boolean;
+  reason: "subscription" | "user_override" | "director_override" | "none";
+  subscription: SchoolSubscription | null;
+  userOverride: UserAccessOverride | null;
+  directorOverride: UserAccessOverride | null;
+  directorUserId: string | null;
+};
+
+/**
+ * Regra de acesso do sistema:
+ * - Assinatura ativa é por ESCOLA (school_subscriptions) e vale para todos.
+ * - Cortesia (override) pode existir por USUÁRIO. Para a equipe pedagógica, herda a cortesia do DIRETOR.
+ */
+export async function getEffectiveAccess(params: {
+  supabase: SupabaseClient;
+  profile: BillingProfile;
+}): Promise<EffectiveAccess> {
+  const { supabase, profile } = params;
+
+  const subscription = await getSchoolSubscription(supabase, profile.school_id);
+  if (isSubscriptionActive(subscription?.status)) {
+    return {
+      active: true,
+      reason: "subscription",
+      subscription,
+      userOverride: null,
+      directorOverride: null,
+      directorUserId: null,
+    };
+  }
+
+  const userOverride = await getUserAccessOverride(supabase, profile.user_id);
+  if (isUserOverrideActive(userOverride)) {
+    return {
+      active: true,
+      reason: "user_override",
+      subscription,
+      userOverride,
+      directorOverride: null,
+      directorUserId: null,
+    };
+  }
+
+  // Herança: se o diretor da escola estiver com cortesia ativa, a equipe pedagógica também fica liberada.
+  if (profile.role === "pedagogical") {
+    try {
+      const admin = createAdminClient();
+      const { data: directors } = await admin
+        .from("profiles")
+        .select("user_id")
+        .eq("school_id", profile.school_id)
+        .eq("role", "director")
+        .limit(1);
+
+      const directorUserId = String((directors as any)?.[0]?.user_id ?? "").trim() || null;
+      if (directorUserId) {
+        const directorOverride = await getUserAccessOverride(admin as any, directorUserId);
+        if (isUserOverrideActive(directorOverride)) {
+          return {
+            active: true,
+            reason: "director_override",
+            subscription,
+            userOverride,
+            directorOverride,
+            directorUserId,
+          };
+        }
+
+        return {
+          active: false,
+          reason: "none",
+          subscription,
+          userOverride,
+          directorOverride,
+          directorUserId,
+        };
+      }
+    } catch {
+      // Se falhar (sem service key, tabela não existe, etc.), seguimos o fluxo padrão.
+    }
+  }
+
+  return {
+    active: false,
+    reason: "none",
+    subscription,
+    userOverride,
+    directorOverride: null,
+    directorUserId: null,
+  };
 }

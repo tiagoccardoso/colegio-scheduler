@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -44,7 +44,7 @@ export default async function Page({
   // Next.js 16 pode tipar searchParams como Promise nos types gerados.
   searchParams?: Promise<SearchParams>;
 }) {
-  const { supabase } = await requireDirector();
+  const { supabase } = await requireStaff();
 
   const sp = (await searchParams) ?? {};
 
@@ -91,7 +91,7 @@ export default async function Page({
 
   async function upsertAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const class_id = String(formData.get("class_id") || "");
     const time_slot_id = String(formData.get("time_slot_id") || "");
@@ -138,7 +138,7 @@ export default async function Page({
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     const class_id = String(formData.get("class_id") || "");
@@ -158,7 +158,7 @@ export default async function Page({
 
   async function clearClassScheduleAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const class_id = String(formData.get("class_id") || "");
     if (!class_id) redirect("/schedule/manual?error=" + encodeMsg("Turma inválida."));

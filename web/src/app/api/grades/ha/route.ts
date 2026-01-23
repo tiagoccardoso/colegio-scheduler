@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeSlots } from "@/lib/time-slots/normalize";
 import { teacherLabel } from "@/lib/schedule/rules";
+import { isStaffRole } from "@/lib/authz";
 
 export async function GET(req: Request) {
   try {
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
       .maybeSingle();
 
     if (!profile?.school_id) return NextResponse.json({ error: "Perfil não encontrado." }, { status: 400 });
-    if (profile.role !== "director") return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+    if (!isStaffRole((profile as any).role)) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
 
     const schoolId = profile.school_id;
 

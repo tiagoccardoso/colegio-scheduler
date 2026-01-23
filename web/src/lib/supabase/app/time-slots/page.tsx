@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -28,7 +28,7 @@ export default async function Page({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const { supabase } = await requireDirector();
+  const { supabase } = await requireStaff();
 
   const msg = typeof searchParams?.msg === "string" ? decodeMsg(searchParams?.msg) : null;
   const error = typeof searchParams?.error === "string" ? decodeMsg(searchParams?.error) : null;
@@ -41,7 +41,7 @@ export default async function Page({
 
   async function createAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const weekday = Number(formData.get("weekday"));
     const starts_at = String(formData.get("starts_at") || "").trim();
@@ -62,7 +62,7 @@ export default async function Page({
 
   async function updateAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     const weekday = Number(formData.get("weekday"));
@@ -82,7 +82,7 @@ export default async function Page({
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/time-slots?error=" + encodeMsg("ID inválido."));

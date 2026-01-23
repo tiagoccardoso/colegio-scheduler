@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
-import { requireAuth } from "@/lib/require-auth";
+import { requireDirector } from "@/lib/require-director";
 import { stripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfile, getOrCreateStripeCustomerId, isSubscriptionActive } from "@/lib/billing";
+import { getOrCreateStripeCustomerId, isSubscriptionActive } from "@/lib/billing";
 import { encodeMsg } from "@/lib/flash";
 
 export default async function BillingReturnPage({
@@ -12,13 +12,11 @@ export default async function BillingReturnPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { supabase, user } = await requireAuth();
+  const { supabase, user, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};
   const sessionId = typeof sp.session_id === "string" ? sp.session_id : null;
   if (!sessionId) redirect("/billing?error=" + encodeMsg("session_id ausente."));
 
-  const profile = await getProfile(supabase as any, user.id);
-  if (!profile?.school_id) redirect("/onboarding");
 
   // Valida que o session_id é do próprio customer do usuário (evita “fuçar” sessão alheia)
   const stripeCustomerId = await getOrCreateStripeCustomerId({

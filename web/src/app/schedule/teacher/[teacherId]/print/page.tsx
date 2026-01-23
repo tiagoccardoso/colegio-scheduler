@@ -1,4 +1,4 @@
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { PrintButton } from "@/components/PrintButton";
 
 type TimeSlotRow = { id: string; weekday: number; starts_at: string; ends_at: string };
@@ -28,7 +28,7 @@ function periodKey(ts: TimeSlotRow) {
 }
 
 export default async function Page({ params }: { params: { teacherId: string } }) {
-  const { supabase } = await requireDirector();
+  const { supabase } = await requireStaff();
 
   const teacherId = params.teacherId;
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateNoConflicts } from "@/lib/schedule/validate";
+import { isStaffRole } from "@/lib/authz";
 
 type BuildReq = {
   shift?: string | null;
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!profile || (profile as any).role !== "director") {
+    if (!profile || !isStaffRole((profile as any).role)) {
       return NextResponse.json({ error: "Apenas diretor pode usar esta função." }, { status: 403 });
     }
 

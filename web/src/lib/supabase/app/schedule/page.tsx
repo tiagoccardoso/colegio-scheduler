@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -38,7 +38,7 @@ export default async function Page({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const { supabase } = await requireDirector();
+  const { supabase } = await requireStaff();
 
   const msg = typeof searchParams?.msg === "string" ? decodeMsg(searchParams?.msg) : null;
   const error = typeof searchParams?.error === "string" ? decodeMsg(searchParams?.error) : null;
@@ -83,7 +83,7 @@ export default async function Page({
 
   async function upsertScheduleAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const class_id = String(formData.get("class_id") || "");
     const time_slot_id = String(formData.get("time_slot_id") || "");
@@ -132,7 +132,7 @@ export default async function Page({
 
   async function deleteScheduleAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireDirector();
+    const { supabase } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     const class_id = String(formData.get("class_id") || "");

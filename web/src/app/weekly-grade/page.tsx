@@ -1,4 +1,4 @@
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { WeeklyGradeBoard } from "@/components/WeeklyGradeBoard";
@@ -66,7 +66,7 @@ export default async function Page({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const { supabase, profile } = await requireDirector();
+  const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
   const shift =

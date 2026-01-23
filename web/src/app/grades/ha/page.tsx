@@ -1,9 +1,9 @@
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { GradesHaClient } from "@/components/GradesHaClient";
 
 export default async function Page() {
-  await requireDirector();
+  await requireStaff();
   return (
     <Shell
       title="Hora Atividade"

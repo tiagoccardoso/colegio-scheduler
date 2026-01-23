@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDirector } from "@/lib/require-director";
+import { requireStaff } from "@/lib/require-staff";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -71,7 +71,7 @@ export default async function Page({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { supabase, profile } = await requireDirector();
+  const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
@@ -124,7 +124,7 @@ export default async function Page({
 
   async function updateHaAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     const teacherId = String(formData.get("teacher_id") || "");
@@ -193,7 +193,7 @@ export default async function Page({
 
   async function deleteHaAction(formData: FormData) {
     "use server";
-    const { supabase, profile } = await requireDirector();
+    const { supabase, profile } = await requireStaff();
 
     const id = String(formData.get("id") || "");
     if (!id) redirect("/time-slots/listagem?error=" + encodeMsg("ID inválido."));
