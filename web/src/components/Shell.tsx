@@ -57,6 +57,7 @@ export function Shell({
   }, [supabase]);
 
   const isDirector = role === "director";
+  const isPedagogical = role === "pedagogical";
   const safeHome =
     homeHref ??
     (isDirector ? (isSubscribed ? "/dashboard" : "/billing") : isSubscribed ? "/dashboard" : "/help");
@@ -82,7 +83,7 @@ export function Shell({
                     <SchoolNameLabel />
                   </Link>
                   <Link
-                    href={isDirector ? "/director" : safeHome}
+                    href={isDirector ? "/director" : isPedagogical ? "/team" : safeHome}
                     className="block text-sm font-semibold text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
                   >
                     {isDirector ? "Painel do diretor" : "Painel da equipe"}

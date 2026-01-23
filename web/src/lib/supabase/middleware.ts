@@ -69,6 +69,9 @@ function isPublicPath(pathname: string) {
   // Painel do diretor deve abrir mesmo sem assinatura (o próprio painel já é restrito por role).
   if (pathname.startsWith("/director")) return true;
 
+  // Painel da equipe (meu cadastro) deve abrir mesmo sem assinatura.
+  if (pathname === "/team" || pathname.startsWith("/team/")) return true;
+
   // Ajuda (acessível mesmo sem assinatura ativa)
   if (pathname.startsWith("/help")) return true;
   if (pathname.startsWith("/api/ai/help")) return true;
@@ -185,9 +188,17 @@ export async function updateSession(request: NextRequest) {
     return r;
   }
 
-  // Páginas: manda para billing
-  const url = new URL("/billing", request.url);
-  url.searchParams.set("error", encodeURIComponent("Assinatura necessária para acessar o sistema."));
+  // Páginas: diretor vai para billing; equipe/usuários vão para ajuda (evita cair em /forbidden).
+  const isDirector = String((profile as any)?.role ?? "") === "director";
+  const url = new URL(isDirector ? "/billing" : "/help", request.url);
+  url.searchParams.set(
+    "error",
+    encodeURIComponent(
+      isDirector
+        ? "Assinatura necessária para acessar o sistema."
+        : "Sistema bloqueado: peça ao diretor para finalizar a assinatura.",
+    ),
+  );
 
   const r = NextResponse.redirect(url);
   pendingCookies.forEach(({ name, value, options }) => r.cookies.set(name, value, options));

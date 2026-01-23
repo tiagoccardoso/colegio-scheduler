@@ -383,6 +383,100 @@ export default async function PedagogicalTeamPage({
     );
   }
 
+  async function updateMemberAction(formData: FormData) {
+    "use server";
+
+    const { profile } = await requireDirectorOnly();
+    const admin = createAdminClient();
+
+    const user_id = String(formData.get("user_id") || "").trim();
+    const full_name = String(formData.get("full_name") || "").trim();
+    const email = String(formData.get("email") || "").trim();
+    const password = String(formData.get("password") || "");
+    const password2 = String(formData.get("password2") || "");
+
+    if (!user_id) redirect("/director/equipe-pedagogica?error=" + encodeMsg("ID inválido."));
+    if (user_id === profile.user_id) {
+      redirect(
+        "/director/equipe-pedagogica?error=" + encodeMsg("Edite o próprio cadastro do diretor no seu perfil."),
+      );
+    }
+    if (!full_name) redirect("/director/equipe-pedagogica?error=" + encodeMsg("Informe o nome."));
+    if (!email || !email.includes("@"))
+      redirect("/director/equipe-pedagogica?error=" + encodeMsg("Informe um e-mail válido."));
+    if (password) {
+      if (password.length < 6)
+        redirect(
+          "/director/equipe-pedagogica?error=" +
+            encodeMsg("A nova senha deve ter pelo menos 6 caracteres (ou deixe em branco para não alterar)."),
+        );
+      if (password !== password2)
+        redirect("/director/equipe-pedagogica?error=" + encodeMsg("As senhas não conferem."));
+    }
+
+    // Garante que o membro pertença à escola e não seja diretor
+    const { data: pRow } = await admin
+      .from("profiles")
+      .select("school_id, role")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    const schoolId = String((pRow as any)?.school_id ?? "");
+    if (!schoolId || schoolId !== profile.school_id) {
+      redirect(
+        "/director/equipe-pedagogica?error=" +
+          encodeMsg("Este usuário não pertence ao seu colégio (ou não possui perfil)."),
+      );
+    }
+
+    if (String((pRow as any)?.role ?? "") === "director") {
+      redirect("/director/equipe-pedagogica?error=" + encodeMsg("Não é permitido editar um diretor."));
+    }
+
+    // 1) Atualiza Auth (email/senha)
+    const authPayload: any = {
+      email,
+      email_confirm: true,
+      user_metadata: { full_name },
+    };
+    if (password) authPayload.password = password;
+
+    const { error: authErr } = await admin.auth.admin.updateUserById(user_id, authPayload);
+    if (authErr) {
+      redirect(
+        "/director/equipe-pedagogica?error=" +
+          encodeMsg("Falha ao atualizar o acesso (Auth): " + authErr.message),
+      );
+    }
+
+    // 2) Atualiza profile
+    const { error: profErr } = await admin
+      .from("profiles")
+      .update({ full_name })
+      .eq("user_id", user_id);
+
+    if (profErr) {
+      redirect(
+        "/director/equipe-pedagogica?error=" +
+          encodeMsg("Acesso atualizado no Auth, mas falhou ao atualizar o perfil: " + profErr.message),
+      );
+    }
+
+    // 3) Atualiza tabela pedagogical_team (best-effort)
+    try {
+      await admin
+        .from("pedagogical_team")
+        .update({ full_name })
+        .eq("user_id", user_id)
+        .eq("school_id", profile.school_id);
+    } catch {
+      // ignore
+    }
+
+    revalidatePath("/director/equipe-pedagogica");
+    redirect("/director/equipe-pedagogica?msg=" + encodeMsg("Acesso atualizado."));
+  }
+
   return (
     <Shell
       title="Equipe pedagógica"
@@ -468,6 +562,43 @@ export default async function PedagogicalTeamPage({
                       <td className="py-2 pr-4 font-mono text-xs text-zinc-500">{m.user_id}</td>
                       <td className="py-2 pr-4">
                         <div className="flex flex-wrap gap-2">
+                          <details className="relative">
+                            <summary className="btn btn-secondary h-9 list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+                              Editar
+                            </summary>
+                            <div className="absolute right-0 z-20 mt-2 w-[360px] panel p-4 shadow-lg">
+                              <div className="text-sm font-semibold">Editar acesso</div>
+                              <form action={updateMemberAction} className="mt-3 grid gap-3">
+                                <input type="hidden" name="user_id" value={m.user_id} />
+
+                                <label className="grid gap-1">
+                                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Nome</span>
+                                  <input name="full_name" defaultValue={m.full_name ?? ""} className="input" />
+                                </label>
+
+                                <label className="grid gap-1">
+                                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">E-mail</span>
+                                  <input name="email" type="email" defaultValue={m.email ?? ""} className="input" />
+                                </label>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  <label className="grid gap-1">
+                                    <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Nova senha (opcional)</span>
+                                    <input name="password" type="password" className="input" placeholder="••••••" />
+                                  </label>
+                                  <label className="grid gap-1">
+                                    <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Confirmar</span>
+                                    <input name="password2" type="password" className="input" placeholder="••••••" />
+                                  </label>
+                                </div>
+
+                                <button type="submit" className="btn btn-primary h-9 w-fit">
+                                  Salvar
+                                </button>
+                              </form>
+                            </div>
+                          </details>
+
                           <form action={setMemberStatusAction}>
                             <input type="hidden" name="user_id" value={m.user_id} />
                             <input type="hidden" name="action" value={m.disabled_at ? "activate" : "deactivate"} />
