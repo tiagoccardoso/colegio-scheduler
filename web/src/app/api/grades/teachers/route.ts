@@ -20,11 +20,19 @@ function teacherVisibleInShift(t: any, shift: string) {
   return arr.length === 0 || arr.includes(shift);
 }
 
+function isAllTeachersToken(v: string) {
+  const k = String(v || "").trim().toUpperCase();
+  return k === "__ALL__" || k === "ALL" || k === "*" || k === "TODOS";
+}
+
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const shift = String(url.searchParams.get("shift") || "MANHA").trim().toUpperCase();
-    const teacherId = String(url.searchParams.get("teacherId") || "").trim();
+    const teacherIdRaw = String(url.searchParams.get("teacherId") || "").trim();
+    const allTeachers = isAllTeachersToken(teacherIdRaw);
+    const teacherId = allTeachers ? "" : teacherIdRaw;
 
     const supabase = await createClient();
     const {
@@ -76,6 +84,8 @@ export async function GET(req: Request) {
       });
 
     const teacherItems = teachers.map((t) => ({ id: String((t as any).id), label: teacherLabel(t) }));
+
+const visibleTeacherIds = teachers.map((t) => String((t as any).id));
 
     const selectedTeacher = teacherId ? teachers.find((t) => String((t as any).id) === teacherId) : null;
     if (teacherId && !selectedTeacher) {
@@ -134,25 +144,21 @@ export async function GET(req: Request) {
     }
 
     let schedules: any[] = [];
-    if (teacherId && slotIds.length > 0) {
+    if ((teacherId || allTeachers) && slotIds.length > 0) {
       const sel = hasActivityType
         ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes"
         : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes";
 
-      const res = await supabase
-        .from("schedules")
-        .select(sel)
-        .eq("school_id", schoolId)
-        .eq("teacher_id", teacherId)
-        .in("time_slot_id", slotIds);
+      const q = supabase.from("schedules").select(sel).eq("school_id", schoolId).in("time_slot_id", slotIds);
+      const res = allTeachers ? await q.in("teacher_id", visibleTeacherIds) : await q.eq("teacher_id", teacherId);
 
       if (res.error) {
-        const legacy = await supabase
+        const q2 = supabase
           .from("schedules")
           .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
           .eq("school_id", schoolId)
-          .eq("teacher_id", teacherId)
           .in("time_slot_id", slotIds);
+        const legacy = allTeachers ? await q2.in("teacher_id", visibleTeacherIds) : await q2.eq("teacher_id", teacherId);
         schedules = (legacy.data as any[]) ?? [];
         hasActivityType = false;
       } else {
@@ -160,19 +166,28 @@ export async function GET(req: Request) {
       }
     }
 
-    const grid: Record<string, any> = {};
+const baseGrid: Record<string, any> = {};
     for (const ts of timeSlots) {
       const k = `${ts.weekday}-${ts.period_index ?? 0}`;
-      grid[k] ||= null;
+      baseGrid[k] ||= null;
     }
+
+    const teacherById = new Map<string, any>(teachersAll.map((t: any) => [String(t.id), t]));
+
+    const gridsByTeacher: Record<string, Record<string, any>> = {};
+    if (allTeachers) {
+      for (const tid of visibleTeacherIds) {
+        gridsByTeacher[tid] = { ...baseGrid };
+      }
+    }
+
+    const grid: Record<string, any> = allTeachers ? {} : { ...baseGrid };
 
     for (const sc of schedules) {
       const ts = slotById.get(sc.time_slot_id);
       if (!ts) continue;
 
-      const act = hasActivityType
-        ? String(sc?.activity_type ?? "AULA").trim().toUpperCase()
-        : "AULA";
+      const act = hasActivityType ? String(sc?.activity_type ?? "AULA").trim().toUpperCase() : "AULA";
       const isHa = act === "HA";
 
       const classId = sc?.class_id ? String(sc.class_id) : "";
@@ -184,8 +199,13 @@ export async function GET(req: Request) {
       }
 
       const k = `${ts.weekday}-${ts.period_index ?? 0}`;
+
+      const targetTeacherId = String(sc.teacher_id ?? "");
+      const targetGrid = allTeachers ? gridsByTeacher[targetTeacherId] : grid;
+      if (!targetGrid) continue;
+
       if (isHa) {
-        grid[k] = {
+        targetGrid[k] = {
           scheduleId: String(sc.id),
           timeSlotId: String(sc.time_slot_id),
           teacherId: String(sc.teacher_id),
@@ -201,13 +221,15 @@ export async function GET(req: Request) {
       const cls = classesById.get(classId);
       const subj = subjectsById.get(String(sc.subject_id ?? ""));
 
+      const t = allTeachers ? teacherById.get(targetTeacherId) : selectedTeacher;
+
       const effRoom = effectiveRoomId({
         scheduleRoomId: sc.room_id,
         classDefaultRoomId: (cls as any)?.default_room_id ?? null,
-        teacherDefaultRoomId: (selectedTeacher as any)?.default_room_id ?? null,
+        teacherDefaultRoomId: (t as any)?.default_room_id ?? null,
       });
 
-      grid[k] = {
+      targetGrid[k] = {
         scheduleId: String(sc.id),
         timeSlotId: String(sc.time_slot_id),
         teacherId: String(sc.teacher_id),
@@ -226,9 +248,13 @@ export async function GET(req: Request) {
       ok: true,
       school: { name: (school as any)?.name ?? null },
       shift,
+      all: allTeachers,
       teacherId: teacherId || null,
       teacher: selectedTeacher ? { id: String((selectedTeacher as any).id), label: teacherLabel(selectedTeacher) } : null,
       teachers: teacherItems,
+      reports: allTeachers
+        ? teacherItems.map((t) => ({ teacher: t, grid: gridsByTeacher[t.id] ?? { ...baseGrid } }))
+        : null,
       editor: {
         teachers: editorTeachers,
         classes: editorClasses,

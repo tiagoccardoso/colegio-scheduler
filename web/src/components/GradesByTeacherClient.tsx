@@ -12,12 +12,34 @@ import {
 
 type TeacherItem = { id: string; label: string };
 
+const ALL_TEACHERS = "__ALL__";
+
+type GridCell =
+  | {
+      scheduleId?: string;
+      timeSlotId: string;
+      teacherId: string;
+      activityType: "AULA" | "HA" | string;
+      classId?: string | null;
+      subjectId?: string | null;
+      roomId?: string | null;
+      className: string;
+      subject: string;
+      room: string | null;
+      notes?: string | null;
+    }
+  | null;
+
+type Grid = Record<string, GridCell>;
+
 type ApiResp = {
   ok: boolean;
   shift: string;
+  all?: boolean;
   teacherId: string | null;
   teacher?: TeacherItem | null;
   teachers: TeacherItem[];
+  reports?: { teacher: TeacherItem; grid: Grid }[] | null;
   school?: { name: string | null };
   editor: {
     teachers: TeacherOption[];
@@ -26,23 +48,7 @@ type ApiResp = {
     rooms: RefOption[];
   };
   timeSlots: { id: string; weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
-  grid: Record<
-    string,
-    | {
-        scheduleId?: string;
-        timeSlotId: string;
-        teacherId: string;
-        activityType: "AULA" | "HA" | string;
-        classId?: string | null;
-        subjectId?: string | null;
-        roomId?: string | null;
-        className: string;
-        subject: string;
-        room: string | null;
-        notes?: string | null;
-      }
-    | null
-  >;
+  grid: Grid;
 };
 
 const WEEKDAY = ["", "2ª FEIRA", "3ª FEIRA", "4ª FEIRA", "5ª FEIRA", "6ª FEIRA"];
@@ -107,6 +113,7 @@ export function GradesByTeacherClient() {
     | {
         scheduleId?: string | null;
         slot: TimeSlotInfo;
+        lockTeacherId: string;
         defaults: {
           activityType: "AULA" | "HA";
           teacherId: string;
@@ -171,10 +178,105 @@ export function GradesByTeacherClient() {
   }, [data?.timeSlots]);
 
   const selectedTeacherLabel = useMemo(() => {
+    if (teacherId === ALL_TEACHERS) return "Todos os professores";
     if (data?.teacher?.label) return data.teacher.label;
     const t = data?.teachers?.find((x) => x.id === teacherId);
     return t?.label ?? "";
   }, [data?.teacher?.label, data?.teachers, teacherId]);
+
+  const isAllTeachers = teacherId === ALL_TEACHERS;
+
+  const renderTable = (grid: Grid, lockTeacherId: string) => (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100 w-40">
+              Período
+            </th>
+            {DAYS.map((d) => (
+              <th
+                key={d}
+                className="border border-zinc-200 bg-zinc-100 p-2 text-left align-bottom text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100"
+              >
+                <div className="text-sm font-bold">{WEEKDAY[d]}</div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {periods.map((p) => {
+            const tm = periodTime[p];
+            const time = tm
+              ? `${fmtTime(tm.starts_at)}${tm.ends_at ? `–${fmtTime(tm.ends_at)}` : ""}`.trim()
+              : "";
+            return (
+              <tr key={p}>
+                <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">
+                  <div className="font-semibold">{p}º</div>
+                  {time ? <div className="text-[11px] text-zinc-600 dark:text-zinc-400">{time}</div> : null}
+                </td>
+                {DAYS.map((d) => {
+                  const key = `${d}-${p}`;
+                  const cell = grid?.[key];
+                  const isHa = cell && String(cell.activityType || "").trim().toUpperCase() === "HA";
+                  const slot = slotByKey.get(key) || null;
+                  return (
+                    <td
+                      key={d}
+                      className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                      onClick={() => {
+                        if (!slot) return;
+                        const defAct = isHa ? "HA" : "AULA";
+                        setEditing({
+                          scheduleId: (cell as any)?.scheduleId ?? null,
+                          slot,
+                          lockTeacherId,
+                          defaults: {
+                            activityType: defAct,
+                            teacherId: lockTeacherId,
+                            classId: !isHa ? String((cell as any)?.classId ?? "") : "",
+                            subjectId: !isHa ? String((cell as any)?.subjectId ?? "") : "",
+                            roomId: !isHa ? String((cell as any)?.roomId ?? "") : "",
+                            notes: String((cell as any)?.notes ?? ""),
+                          },
+                        });
+                      }}
+                    >
+                      {cell ? (
+                        <div className="leading-tight">
+                          {isHa ? (
+                            <>
+                              <div className="font-semibold">Hora Atividade</div>
+                              {cell.notes ? (
+                                <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.notes}</div>
+                              ) : (
+                                <div className="text-[11px] text-zinc-500 dark:text-zinc-400">(sem observações)</div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-semibold">{cell.className}</div>
+                              <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.subject}</div>
+                              {cell.room ? (
+                                <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.room}</div>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
+
 
   return (
     <div>
@@ -200,6 +302,10 @@ export function GradesByTeacherClient() {
           onChange={(e) => setTeacherId(e.target.value)}
           className="min-w-[260px] rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-900 dark:bg-zinc-950"
         >
+          <option value="" disabled>
+            Selecione…
+          </option>
+          <option value={ALL_TEACHERS}>Todos os professores</option>
           {(data?.teachers || []).map((t) => (
             <option key={t.id} value={t.id}>
               {t.label}
@@ -226,7 +332,7 @@ export function GradesByTeacherClient() {
       </div>
 
       {(data?.school?.name || selectedTeacherLabel) && (
-        <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:border-none print:shadow-none">
+        <div className={`mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:border-none print:shadow-none ${isAllTeachers ? "print:hidden" : ""}`}>
           <div className="font-semibold">{data?.school?.name ?? ""}</div>
           <div className="mt-2 text-sm">
             <span className="font-semibold">Professor:</span> {selectedTeacherLabel || "—"}
@@ -244,91 +350,35 @@ export function GradesByTeacherClient() {
 
       {loading && <div className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Carregando…</div>}
 
-      {data?.ok && teacherId && (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100 w-40">
-                  Período
-                </th>
-                {DAYS.map((d) => (
-                  <th
-                    key={d}
-                    className="border border-zinc-200 bg-zinc-100 p-2 text-left align-bottom text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 print:bg-zinc-100"
-                  >
-                    <div className="text-sm font-bold">{WEEKDAY[d]}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {periods.map((p) => {
-                const tm = periodTime[p];
-                const time = tm ? `${fmtTime(tm.starts_at)}${tm.ends_at ? `–${fmtTime(tm.ends_at)}` : ""}`.trim() : "";
-                return (
-                  <tr key={p}>
-                    <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">
-                      <div className="font-semibold">{p}º</div>
-                      {time ? <div className="text-[11px] text-zinc-600 dark:text-zinc-400">{time}</div> : null}
-                    </td>
-                    {DAYS.map((d) => {
-                      const key = `${d}-${p}`;
-                      const cell = data.grid?.[key];
-                      const isHa = cell && String(cell.activityType || "").trim().toUpperCase() === "HA";
-                      const slot = slotByKey.get(key) || null;
-                      return (
-                        <td
-                          key={d}
-                          className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
-                          onClick={() => {
-                            if (!slot) return;
-                            const defAct = isHa ? "HA" : "AULA";
-                            setEditing({
-                              scheduleId: (cell as any)?.scheduleId ?? null,
-                              slot,
-                              defaults: {
-                                activityType: defAct,
-                                teacherId: teacherId,
-                                classId: !isHa ? String((cell as any)?.classId ?? "") : "",
-                                subjectId: !isHa ? String((cell as any)?.subjectId ?? "") : "",
-                                roomId: !isHa ? String((cell as any)?.roomId ?? "") : "",
-                                notes: String((cell as any)?.notes ?? ""),
-                              },
-                            });
-                          }}
-                        >
-                          {cell ? (
-                            <div className="leading-tight">
-                              {isHa ? (
-                                <>
-                                  <div className="font-semibold">Hora Atividade</div>
-                                  {cell.notes ? (
-                                    <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.notes}</div>
-                                  ) : (
-                                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400">(sem observações)</div>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <div className="font-semibold">{cell.className}</div>
-                                  <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.subject}</div>
-                                  {cell.room ? (
-                                    <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.room}</div>
-                                  ) : null}
-                                </>
-                              )}
-                            </div>
-                          ) : null}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {data?.ok && (
+        <>
+          {isAllTeachers ? (
+            <div className="mt-4">
+              {(data?.reports || []).map((r) => (
+                <div key={r.teacher.id} className="teacher-report-page">
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-950 print:border-none print:shadow-none">
+                    <div className="font-semibold">{data?.school?.name ?? ""}</div>
+                    <div className="mt-2 text-sm">
+                      <span className="font-semibold">Professor:</span> {r.teacher.label || "—"}
+                      <span className="mx-2 text-zinc-400">•</span>
+                      <span className="font-semibold">Turno:</span> {shiftLabel(shift)}
+                      {reportDate ? (
+                        <>
+                          <span className="mx-2 text-zinc-400">•</span>
+                          <span className="font-semibold">Data:</span> {fmtDatePtBr(reportDate)}
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {renderTable(r.grid, r.teacher.id)}
+                </div>
+              ))}
+            </div>
+          ) : teacherId ? (
+            renderTable(data?.grid || {}, teacherId)
+          ) : null}
+        </>
       )}
 
       {editing && data?.editor ? (
@@ -340,7 +390,7 @@ export function GradesByTeacherClient() {
           classes={data.editor.classes}
           subjects={data.editor.subjects}
           rooms={data.editor.rooms}
-          lockTeacherId={teacherId}
+          lockTeacherId={editing.lockTeacherId}
           defaults={editing.defaults}
           onClose={() => setEditing(null)}
           onSave={async (payload) => {
@@ -376,6 +426,16 @@ export function GradesByTeacherClient() {
         @media print {
           @page { size: A4 portrait; margin: 12mm; }
           table, th, td { border: 1px solid #333 !important; }
+          .teacher-report-page {
+            break-after: page;
+            page-break-after: always;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .teacher-report-page:last-child {
+            break-after: auto;
+            page-break-after: auto;
+          }
         }
       `}</style>
     </div>
