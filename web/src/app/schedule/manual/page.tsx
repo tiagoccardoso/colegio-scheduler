@@ -32,6 +32,20 @@ const WEEKDAYS: { key: number; label: string }[] = [
   { key: 5, label: "Sex" },
 ];
 
+type Shift = "MANHA" | "TARDE" | "NOITE";
+const DEFAULT_SHIFT: Shift = "MANHA";
+const ALLOWED_SHIFTS = new Set<Shift>(["MANHA", "TARDE", "NOITE"]);
+
+function normalizeShiftParam(v: any): Shift | null {
+  const k = String(v ?? "").trim().toUpperCase();
+  if (!k) return null;
+  if (k.startsWith("MAN")) return "MANHA";
+  if (k.startsWith("TAR")) return "TARDE";
+  if (k.startsWith("NOI")) return "NOITE";
+  return (ALLOWED_SHIFTS as any).has(k) ? (k as Shift) : null;
+}
+
+
 function periodKey(ts: TimeSlotRow) {
   return `${ts.starts_at}-${ts.ends_at}`;
 }
@@ -44,25 +58,44 @@ export default async function Page({
   // Next.js 16 pode tipar searchParams como Promise nos types gerados.
   searchParams?: Promise<SearchParams>;
 }) {
-  const { supabase } = await requireStaff();
-
+  const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
   const msg = typeof sp?.msg === "string" ? decodeMsg(sp?.msg) : null;
   const error = typeof sp?.error === "string" ? decodeMsg(sp?.error) : null;
   const classId = typeof sp?.classId === "string" ? sp?.classId : null;
+  const shiftParam = typeof sp?.shift === "string" ? sp?.shift : null;
 
-  const { data: classes } = await supabase.from("classes").select("id, name, shift").order("name", { ascending: true });
-  const { data: subjects } = await supabase.from("subjects").select("id, name").order("name", { ascending: true });
-  const { data: teachers } = await supabase.from("teachers").select("id, name").order("name", { ascending: true });
-  const { data: rooms } = await supabase.from("rooms").select("id, name").order("name", { ascending: true });
+  // ID da escola vem do perfil do usuário autenticado.
+  const schoolId = profile.school_id;
+
+  const { data: classes } = await supabase.from("classes").select("id, name, shift").eq("school_id", schoolId).order("name", { ascending: true });
+  const { data: subjects } = await supabase.from("subjects").select("id, name").eq("school_id", schoolId).order("name", { ascending: true });
+  const { data: teachers } = await supabase.from("teachers").select("id, name").eq("school_id", schoolId).order("name", { ascending: true });
+  const { data: rooms } = await supabase.from("rooms").select("id, name").eq("school_id", schoolId).order("name", { ascending: true });
+
+
+  const shiftFromQuery = normalizeShiftParam(shiftParam);
+  let shift: Shift = shiftFromQuery ?? DEFAULT_SHIFT;
+
+  // Se o turno não veio na URL, tenta inferir pela turma selecionada (quando existir).
+  if (!shiftFromQuery && classId) {
+    const cls = (((classes as any) ?? []) as any[]).find((c: any) => String(c?.id ?? "") === classId);
+    const s = normalizeShiftParam((cls as any)?.shift);
+    if (s) shift = s;
+  }
+
 
   const { data: timeSlots } = await supabase
     .from("time_slots")
     .select("id, weekday, starts_at, ends_at")
+    .eq("school_id", schoolId)
+    .eq("shift", shift)
     .in("weekday", WEEKDAYS.map((w) => w.key))
     .order("weekday", { ascending: true })
     .order("starts_at", { ascending: true });
+
+  const slotIds = ((timeSlots as TimeSlotRow[] | null) ?? []).map((ts) => ts.id);
 
   const periods = new Map<string, { starts_at: string; ends_at: string }>();
   const slotByDayAndPeriod = new Map<string, TimeSlotRow>();
@@ -77,14 +110,17 @@ export default async function Page({
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
   let schedules: ScheduleRow[] = [];
-  if (classId) {
-    const { data: sched } = await supabase
+  if (classId && slotIds.length) {
+    const q = supabase
       .from("schedules")
       .select("id, time_slot_id, subject_id, teacher_id, room_id, subject:subjects(name), teacher:teachers(name), room:rooms(name)")
-      .eq("class_id", classId);
+      .eq("class_id", classId)
+      .in("time_slot_id", slotIds);
 
+    const { data: sched } = await q;
     schedules = (sched as any) ?? [];
   }
+
 
   const scheduleBySlot = new Map<string, ScheduleRow>();
   schedules.forEach((s) => scheduleBySlot.set(s.time_slot_id, s));
@@ -94,6 +130,7 @@ export default async function Page({
     const { supabase, profile } = await requireStaff();
 
     const class_id = String(formData.get("class_id") || "");
+    const shift = normalizeShiftParam(formData.get("shift")) ?? DEFAULT_SHIFT;
     const time_slot_id = String(formData.get("time_slot_id") || "");
     const subject_id = String(formData.get("subject_id") || "");
     const teacher_id = String(formData.get("teacher_id") || "");
@@ -101,7 +138,7 @@ export default async function Page({
     const room_id = room_id_raw ? room_id_raw : null;
 
     if (!class_id || !time_slot_id || !subject_id || !teacher_id) {
-      redirect("/schedule/manual?error=" + encodeMsg("Preencha os campos obrigatórios."));
+      redirect("/schedule/manual?shift=" + encodeURIComponent(shift) + "&error=" + encodeMsg("Preencha os campos obrigatórios."));
     }
 
     const { data: existing } = await supabase
@@ -127,32 +164,32 @@ export default async function Page({
 
     if (result.error) {
       redirect(
-        "/schedule/manual?classId=" + encodeURIComponent(class_id) + "&error=" + encodeMsg(result.error.message),
+        "/schedule/manual?classId=" + encodeURIComponent(class_id) + "&shift=" + encodeURIComponent(shift) + "&error=" + encodeMsg(result.error.message),
       );
     }
 
     revalidatePath("/schedule");
     revalidatePath("/schedule/manual");
-    redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&msg=" + encodeMsg("Aula salva."));
+    redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&shift=" + encodeURIComponent(shift) + "&msg=" + encodeMsg("Aula salva."));
   }
 
   async function deleteAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireStaff();
-
+    const { supabase, profile } = await requireStaff();
     const id = String(formData.get("id") || "");
     const class_id = String(formData.get("class_id") || "");
-    if (!id) redirect("/schedule/manual?error=" + encodeMsg("ID inválido."));
+    const shift = normalizeShiftParam(formData.get("shift")) ?? DEFAULT_SHIFT;
+    if (!id) redirect("/schedule/manual?shift=" + encodeURIComponent(shift) + "&error=" + encodeMsg("ID inválido."));
 
     const { error } = await supabase.from("schedules").delete().eq("id", id);
     if (error)
       redirect(
-        "/schedule/manual?classId=" + encodeURIComponent(class_id) + "&error=" + encodeMsg(error.message),
+        "/schedule/manual?classId=" + encodeURIComponent(class_id) + "&shift=" + encodeURIComponent(shift) + "&error=" + encodeMsg(error.message),
       );
 
     revalidatePath("/schedule");
     revalidatePath("/schedule/manual");
-    redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&msg=" + encodeMsg("Aula removida."));
+    redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&shift=" + encodeURIComponent(shift) + "&msg=" + encodeMsg("Aula removida."));
   }
 
 
@@ -161,7 +198,8 @@ export default async function Page({
     const { supabase, profile } = await requireStaff();
 
     const class_id = String(formData.get("class_id") || "");
-    if (!class_id) redirect("/schedule/manual?error=" + encodeMsg("Turma inválida."));
+    const shift = normalizeShiftParam(formData.get("shift")) ?? DEFAULT_SHIFT;
+    if (!class_id) redirect("/schedule/manual?shift=" + encodeURIComponent(shift) + "&error=" + encodeMsg("Turma inválida."));
 
     const { error } = await supabase
       .from("schedules")
@@ -170,11 +208,11 @@ export default async function Page({
       .eq("class_id", class_id);
 
     if (error) {
-      redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&error=" + encodeMsg(error.message));
+      redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&shift=" + encodeURIComponent(shift) + "&error=" + encodeMsg(error.message));
     }
 
     revalidatePath("/schedule/manual");
-    redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&msg=" + encodeMsg("Grade zerada."));
+    redirect("/schedule/manual?classId=" + encodeURIComponent(class_id) + "&shift=" + encodeURIComponent(shift) + "&msg=" + encodeMsg("Grade zerada."));
   }
 
 
@@ -199,7 +237,7 @@ export default async function Page({
             Navigation via Server Action can fail silently in some dev/prod setups.
             This client component uses a full page navigation with querystring which is robust.
           */}
-          <ScheduleClassPicker classes={((classes as ClassRow[] | null) ?? [])} initialClassId={classId} />
+          <ScheduleClassPicker classes={((classes as ClassRow[] | null) ?? [])} initialClassId={classId} initialShift={shift} />
         </div>
 
         {!classId ? <p className="text-sm text-zinc-600 dark:text-zinc-400">Selecione uma turma para visualizar a grade.</p> : null}
@@ -212,6 +250,7 @@ export default async function Page({
 
               <form action={clearClassScheduleAction}>
                 <input type="hidden" name="class_id" value={classId} />
+                <input type="hidden" name="shift" value={shift} />
                 <ConfirmButton
                   confirmText="Zerar toda a grade desta turma? Todas as aulas cadastradas serão removidas."
                   type="submit"
@@ -245,6 +284,7 @@ export default async function Page({
                         const baseForm = (defaults?: { subject_id?: string; teacher_id?: string; room_id?: string | null }) => (
                           <form action={upsertAction} className="mt-3 grid gap-3">
                             <input type="hidden" name="class_id" value={classId} />
+                <input type="hidden" name="shift" value={shift} />
                             <input type="hidden" name="time_slot_id" value={ts.id} />
 
                             <label className="grid gap-2">
@@ -297,6 +337,7 @@ export default async function Page({
                                   <form action={deleteAction}>
                                     <input type="hidden" name="id" value={sched.id} />
                                     <input type="hidden" name="class_id" value={classId} />
+                <input type="hidden" name="shift" value={shift} />
                                     <ConfirmButton confirmText="Remover esta aula?" type="submit" className="btn btn-danger">
                                       Remover
                                     </ConfirmButton>

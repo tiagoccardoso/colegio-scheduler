@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeSlots } from "@/lib/time-slots/normalize";
+import { parseTeachingRulesJson } from "@/lib/schedule/teaching-rules";
 import { subjectLabel, teacherLabel, roomLabel, effectiveRoomId } from "@/lib/schedule/rules";
 import { isStaffRole } from "@/lib/authz";
 
@@ -58,9 +59,29 @@ export async function GET(req: Request) {
 
     // Classes do turno (grade geral)
     const classesAll = ((classesRaw as any[]) ?? []).slice();
+
+    // Inclui também turmas que estejam alocadas em teaching_rules dos professores para este turno,
+    // mesmo que o campo classes.shift esteja vazio ou divergente.
+    const allocatedClassIds = new Set<string>();
+    for (const t of ((teachersRaw as any[]) ?? [])) {
+      try {
+        const rules = parseTeachingRulesJson((t as any)?.teaching_rules);
+        for (const r of rules) {
+          const rs = normalizeShift((r as any)?.shift);
+          if (!rs || rs !== shift) continue;
+          const cid = String((r as any)?.class_id ?? "").trim();
+          if (cid) allocatedClassIds.add(cid);
+        }
+      } catch {
+        // ignora teacher_rules inválidas
+      }
+    }
+
     const classes = classesAll.filter((c) => {
+      const id = String((c as any)?.id ?? "").trim();
       const s = normalizeShift((c as any)?.shift);
-      return !s || s === shift;
+      if (!s || s === shift) return true;
+      return allocatedClassIds.has(id);
     });
 
     const roomsById = new Map<string, any>(((roomsRaw as any[]) ?? []).map((r) => [r.id, r]));

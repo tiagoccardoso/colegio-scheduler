@@ -2,13 +2,50 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 
+import {
+  ScheduleEditorModal,
+  type ClassOption,
+  type RefOption,
+  type TeacherOption,
+  type TimeSlotInfo,
+} from "@/components/ScheduleEditorModal";
+
 type GradeByClassResp = {
   ok: boolean;
   shift: string;
   school?: { name: string | null };
-  timeSlots: { weekday: number; period_index: number | null; starts_at: string | null; ends_at: string | null }[];
+  editor?: {
+    teachers: TeacherOption[];
+    classes: ClassOption[];
+    subjects: RefOption[];
+    rooms: RefOption[];
+  };
+  timeSlots: {
+    id: string;
+    weekday: number;
+    period_index: number | null;
+    starts_at: string | null;
+    ends_at: string | null;
+  }[];
   classes: { id: string; header: { sala: string; levelStage: string; turma: string } }[];
-  grid: Record<string, Record<string, { subject: string; teacher: string; room?: string | null }>>;
+  grid: Record<
+    string,
+    Record<
+      string,
+      {
+        scheduleId?: string;
+        timeSlotId: string;
+        teacherId: string;
+        classId: string;
+        subjectId: string;
+        roomId?: string | null;
+        subject: string;
+        teacher: string;
+        room?: string | null;
+        notes?: string | null;
+      }
+    >
+  >;
 };
 
 type HaResp = {
@@ -73,6 +110,26 @@ function normShift(v: string | null | undefined) {
   return "MANHA";
 }
 
+async function apiJson<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(init?.headers || {}),
+      },
+    });
+    const json = (await res.json()) as any;
+    if (!res.ok) return { ok: false, error: json?.error || res.statusText };
+    return { ok: true, data: json as T };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Erro de rede" };
+  }
+}
+
 export function ScheduleGeneralClient(props: {
   initialShift?: string | null;
   initialClassId?: string | null;
@@ -91,6 +148,25 @@ export function ScheduleGeneralClient(props: {
   const [general, setGeneral] = useState<GeneralResp | null>(null);
   const [gradeState, setGradeState] = useState<StateResp | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [nonce, setNonce] = useState(0);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [editing, setEditing] = useState<
+    | null
+    | {
+        scheduleId?: string | null;
+        lockClassId: string;
+        slot: TimeSlotInfo;
+        defaults: {
+          activityType: "AULA" | "HA";
+          teacherId: string;
+          classId: string;
+          subjectId: string;
+          roomId: string;
+          notes: string;
+        };
+      }
+  >(null);
 
   async function fetchState(targetShift: string) {
     const params = new URLSearchParams();
@@ -187,7 +263,23 @@ export function ScheduleGeneralClient(props: {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shift]);
+  }, [shift, nonce]);
+
+  const slotByKey = useMemo(() => {
+    const m = new Map<string, TimeSlotInfo>();
+    for (const ts of data?.timeSlots || []) {
+      const p = ts.period_index;
+      if (!p) continue;
+      m.set(`${ts.weekday}-${p}`, {
+        id: ts.id,
+        weekday: ts.weekday,
+        period_index: ts.period_index,
+        starts_at: ts.starts_at,
+        ends_at: ts.ends_at,
+      });
+    }
+    return m;
+  }, [data?.timeSlots]);
 
   const perDay = useMemo(() => {
     const map: Record<number, number[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
@@ -261,6 +353,11 @@ export function ScheduleGeneralClient(props: {
 
   return (
     <div className="grid gap-4">
+      {banner ? (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-800 shadow-sm dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-200">
+          {banner}
+        </div>
+      ) : null}
       <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-2">
@@ -341,6 +438,7 @@ export function ScheduleGeneralClient(props: {
         </div>
 
         <div className="mt-3 grid gap-2 text-sm">
+          <div className="text-zinc-600 dark:text-zinc-400">Dica: clique em uma célula da grade para adicionar/editar uma aula.</div>
           {gradeState?.ok ? (
             <div className="text-zinc-600 dark:text-zinc-400">
               {gradeState.hasGrade
@@ -451,14 +549,14 @@ export function ScheduleGeneralClient(props: {
 
       {data?.ok && (
         <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-          <table className="w-full border-collapse">
+          <table className="min-w-full w-max border-collapse">
             <thead>
               <tr>
-                <th className="border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 w-28"></th>
+                <th className="sticky left-0 z-30 border border-zinc-200 bg-zinc-100 p-2 text-left text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 w-28"></th>
                 {visibleClasses.map((c) => (
                   <th
                     key={c.id}
-                    className="border border-zinc-200 bg-zinc-100 p-2 text-left align-bottom text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900"
+                    className="border border-zinc-200 bg-zinc-100 p-2 text-left align-bottom text-xs font-semibold dark:border-zinc-800 dark:bg-zinc-900 min-w-[220px]"
                   >
                     <div className="text-sm font-bold">{c.header.sala}</div>
                     <div className="text-[11px] font-medium">{c.header.levelStage}</div>
@@ -484,13 +582,35 @@ export function ScheduleGeneralClient(props: {
                   </tr>
                   {perDay[d].map((p) => (
                     <tr key={`${d}-${p}`}>
-                      <td className="border border-zinc-200 p-2 text-center text-xs dark:border-zinc-800 w-28">
+                      <td className="sticky left-0 z-20 border border-zinc-200 p-2 text-center text-xs dark:border-zinc-800 w-28 bg-white dark:bg-zinc-950">
                         {p}º
                       </td>
                       {visibleClasses.map((c) => {
-                        const cell = data.grid?.[`${d}-${p}`]?.[c.id];
+                        const key = `${d}-${p}`;
+                        const cell = data.grid?.[key]?.[c.id];
+                        const slot = slotByKey.get(key) || null;
                         return (
-                          <td key={c.id} className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16">
+                          <td
+                            key={c.id}
+                            className="border border-zinc-200 p-2 align-top text-xs dark:border-zinc-800 h-16 min-w-[220px] cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                            onClick={() => {
+                              if (!slot) return;
+                              setBanner(null);
+                              setEditing({
+                                scheduleId: (cell as any)?.scheduleId ?? null,
+                                lockClassId: c.id,
+                                slot,
+                                defaults: {
+                                  activityType: "AULA",
+                                  teacherId: String((cell as any)?.teacherId ?? ""),
+                                  classId: c.id,
+                                  subjectId: String((cell as any)?.subjectId ?? ""),
+                                  roomId: String((cell as any)?.roomId ?? ""),
+                                  notes: String((cell as any)?.notes ?? ""),
+                                },
+                              });
+                            }}
+                          >
                             {cell ? (
                               <div className="leading-tight">
                                 <div className="font-semibold">{cell.subject}</div>
@@ -531,6 +651,48 @@ export function ScheduleGeneralClient(props: {
           </table>
         </div>
       )}
+
+
+      {editing && data?.editor ? (
+        <ScheduleEditorModal
+          open={Boolean(editing)}
+          scheduleId={editing.scheduleId ?? undefined}
+          slot={editing.slot}
+          teachers={data.editor.teachers}
+          classes={data.editor.classes}
+          subjects={data.editor.subjects}
+          rooms={data.editor.rooms}
+          lockClassId={editing.lockClassId}
+          defaults={editing.defaults}
+          onClose={() => setEditing(null)}
+          onSave={async (payload) => {
+            setBanner(null);
+            const r = await apiJson<any>("/api/weekly-grade/set", {
+              method: "POST",
+              body: JSON.stringify({ shift, ...payload }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setEditing(null);
+            setNonce((n) => n + 1);
+          }}
+          onDelete={async (sid) => {
+            setBanner(null);
+            const r = await apiJson<any>("/api/weekly-grade/delete", {
+              method: "POST",
+              body: JSON.stringify({ shift, scheduleId: sid }),
+            });
+            if (!r.ok) {
+              setBanner(r.error);
+              return;
+            }
+            setEditing(null);
+            setNonce((n) => n + 1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
