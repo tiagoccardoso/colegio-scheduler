@@ -272,7 +272,7 @@ export default async function BillingPage({
                 <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <div className="text-base font-semibold">Plano Profissional</div>
+                      <div className="text-base font-semibold">Planos</div>
                       <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
                         Acesso completo ao gerador de grade e relatórios.
                         <span className="block mt-1 text-xs text-zinc-500">Primeira assinatura ganha teste grátis de {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias (cartão obrigatório).</span>
@@ -283,9 +283,9 @@ export default async function BillingPage({
                     </div>
                   </div>
                   <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-                    <li>Cadastros ilimitados (turmas, professores, salas)</li>
-                    <li>Geração automática com IA (se habilitado)</li>
-                    <li>Relatórios de grade (turma/sala/professor)</li>
+                    <li>Cadastros ilimitados</li>
+                    <li>Montagem de grade com revisão de conflitos</li>
+                    <li>Relatórios</li>
                   </ul>
                 </div>
 

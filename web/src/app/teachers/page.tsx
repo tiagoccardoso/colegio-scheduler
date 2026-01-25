@@ -98,9 +98,11 @@ export default async function Page({
     "use server";
     const { supabase, profile } = await requireStaff();
 
+    const criteria = String(formData.get("restrictions") || "").trim();
+
     const parsedRules = parseTeachingRulesJson(formData.get("teaching_rules_json"));
-    if (parsedRules.length === 0) {
-      redirect("/teachers?error=" + encodeMsg("Inclua ao menos 1 habilitação por horário (botão Incluir)."));
+    if (parsedRules.length === 0 && !criteria) {
+      redirect("/teachers?error=" + encodeMsg("Informe pelo menos uma turma vinculada ou preencha o campo Critérios."));
     }
 
     const derived = deriveLegacyFieldsFromTeachingRules(parsedRules);
@@ -110,7 +112,7 @@ export default async function Page({
       name: String(formData.get("name") || "").trim() || null,
       short_name: String(formData.get("short_name") || "").trim() || null,
       email: String(formData.get("email") || "").trim() || null,
-      restrictions: String(formData.get("restrictions") || "").trim() || null,
+      restrictions: criteria || null,
 
       teaching_rules: parsedRules,
 
@@ -141,9 +143,11 @@ export default async function Page({
     const id = String(formData.get("id") || "");
     if (!id) redirect("/teachers?error=" + encodeMsg("ID inválido."));
 
+    const criteria = String(formData.get("restrictions") || "").trim();
+
     const parsedRules = parseTeachingRulesJson(formData.get("teaching_rules_json"));
-    if (parsedRules.length === 0) {
-      redirect("/teachers?error=" + encodeMsg("Inclua ao menos 1 habilitação por horário (botão Incluir)."));
+    if (parsedRules.length === 0 && !criteria) {
+      redirect("/teachers?error=" + encodeMsg("Informe pelo menos uma turma vinculada ou preencha o campo Critérios."));
     }
 
     const derived = deriveLegacyFieldsFromTeachingRules(parsedRules);
@@ -152,7 +156,7 @@ export default async function Page({
       name: String(formData.get("name") || "").trim() || null,
       short_name: String(formData.get("short_name") || "").trim() || null,
       email: String(formData.get("email") || "").trim() || null,
-      restrictions: String(formData.get("restrictions") || "").trim() || null,
+      restrictions: criteria || null,
 
       teaching_rules: parsedRules,
 
@@ -232,11 +236,11 @@ export default async function Page({
               />
 
               <label className="grid gap-2">
-                <span className="text-sm font-semibold">Restrições (opcional)</span>
+                <span className="text-sm font-semibold">Critérios (opcional se houver turma vinculada)</span>
                 <textarea
                   name="restrictions"
                   rows={3}
-                  placeholder="Ex.: não pode 1º período; evitar sexta; prefere não fechar o turno..."
+                  placeholder="Ex.: 10 aulas de Matemática; só Seg–Qua; preferir últimos períodos da manhã; Turmas A e B..."
                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
                 />
               </label>
@@ -289,6 +293,12 @@ export default async function Page({
                       <td className="px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">{roomsLabel}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/teachers/ai?teacherId=${row.id}`}
+                            className="h-9 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
+                          >
+                            Horários (IA)
+                          </a>
                           <details open={Boolean(focusId && focusId === row.id)}>
                             <summary className="cursor-pointer text-sm font-semibold">Editar</summary>
                             <form action={updateAction} className="mt-3 grid w-[860px] max-w-[calc(100vw-3rem)] gap-4">
@@ -325,10 +335,11 @@ export default async function Page({
                               />
 
                               <label className="grid gap-2">
-                                <span className="text-sm font-semibold">Restrições (opcional)</span>
+                                <span className="text-sm font-semibold">Critérios (opcional se houver turma vinculada)</span>
                                 <textarea
                                   name="restrictions"
                                   rows={3}
+                                  placeholder="Ex.: 10 aulas de Matemática; só Seg–Qua; preferir últimos períodos da manhã; Turmas A e B..."
                                   defaultValue={row.restrictions ?? ""}
                                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
                                 />

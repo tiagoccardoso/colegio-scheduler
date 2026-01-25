@@ -53,7 +53,7 @@ export function ScheduleAutoBuilder(props: { enabled: boolean; classId: string; 
         <div>
           <h3 className="text-sm font-semibold">Gerar grade com IA</h3>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Preenche automaticamente os horários da turma (respeitando conflitos e as restrições do professor). Se houver matriz curricular cadastrada, respeita a carga semanal por disciplina.
+            Preenche automaticamente os horários da turma (respeitando conflitos e as critérios do professor). Se houver matriz curricular cadastrada, respeita a carga semanal por disciplina.
           </p>
         </div>
 
