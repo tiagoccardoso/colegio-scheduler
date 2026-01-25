@@ -26,8 +26,9 @@ export default async function BillingPage({
   const { supabase, user, profile } = await requireDirector();
   const sp = (await searchParams) ?? {};
 
-  const selectedPlan = ((): "monthly" | "yearly" => {
+  const selectedPlan = ((): "trial" | "monthly" | "yearly" => {
     const p = typeof sp.plan === "string" ? sp.plan : "";
+    if (p === "trial") return "trial";
     return p === "yearly" ? "yearly" : "monthly";
   })();
 
@@ -37,6 +38,7 @@ export default async function BillingPage({
 
   const sub = await getSchoolSubscription(supabase as any, profile.school_id);
   const paidActive = isSubscriptionActive(sub?.status);
+  const hasEverSubscribed = Boolean(sub?.stripe_subscription_id || sub?.status);
 
   const userOverride = await getUserAccessOverride(supabase as any, user.id);
   const courtesyActive = isUserOverrideActive(userOverride);
@@ -66,6 +68,20 @@ export default async function BillingPage({
       );
     }
 
+    const trialDays = Number(process.env.STRIPE_TRIAL_DAYS ?? "7");
+
+    // Trial só quando o usuário escolhe explicitamente o plano "trial"
+    // e apenas para a primeira assinatura da escola (evita “trial infinito” via cancelamento/recompra).
+    const existingSub = await getSchoolSubscription(supabase as any, profile.school_id);
+    const hasEverSubscribed = Boolean(existingSub?.stripe_subscription_id || existingSub?.status);
+
+    if (plan === "trial" && hasEverSubscribed) {
+      redirect("/billing?error=" + encodeMsg("O teste grátis está disponível apenas na primeira assinatura desta escola."));
+    }
+
+    const enableTrial =
+      plan === "trial" && !hasEverSubscribed && Number.isFinite(trialDays) && trialDays > 0;
+
     let sessionUrl: string | null = null;
     try {
       const stripeCustomerId = await getOrCreateStripeCustomerId({
@@ -83,7 +99,13 @@ export default async function BillingPage({
         allow_promotion_codes: true,
         success_url: `${origin}/billing/return?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/billing`,
+        payment_method_collection: "always", // exige cartão mesmo durante trial
         subscription_data: {
+          trial_period_days: enableTrial ? trialDays : undefined,
+          // Mesmo exigindo cartão, isso deixa o comportamento explícito caso o método de pagamento falhe.
+          trial_settings: {
+            end_behavior: { missing_payment_method: "cancel" },
+          },
           metadata: { user_id: user.id, school_id: profile.school_id },
         },
         metadata: { user_id: user.id, school_id: profile.school_id },
@@ -253,6 +275,7 @@ export default async function BillingPage({
                       <div className="text-base font-semibold">Plano Profissional</div>
                       <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
                         Acesso completo ao gerador de grade e relatórios.
+                        <span className="block mt-1 text-xs text-zinc-500">Primeira assinatura ganha teste grátis de {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias (cartão obrigatório).</span>
                       </div>
                     </div>
                     <div className="text-xs text-zinc-500">
@@ -266,7 +289,43 @@ export default async function BillingPage({
                   </ul>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div
+                    className={
+                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
+                      (selectedPlan === "trial"
+                        ? "border-zinc-900 dark:border-white"
+                        : "border-zinc-200 dark:border-zinc-900")
+                    }
+                  >
+                    <div className="text-sm font-semibold">Teste grátis</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight">
+                      R$ 0 por {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? process.env.STRIPE_TRIAL_DAYS ?? "7"} dias
+                    </div>
+                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      Cartão obrigatório. Cobrança após o período de teste.
+                    </div>
+                    <form action={startCheckout} className="mt-4">
+                      <input type="hidden" name="plan" value="trial" />
+                      <button
+                        className={
+                          "btn btn-primary w-full " +
+                          (hasEverSubscribed ? "opacity-50 cursor-not-allowed" : "")
+                        }
+                        type="submit"
+                        disabled={hasEverSubscribed}
+                        title={hasEverSubscribed ? "Disponível apenas na primeira assinatura desta escola." : ""}
+                      >
+                        Começar teste grátis
+                      </button>
+                    </form>
+                    {hasEverSubscribed ? (
+                      <div className="mt-2 text-xs text-zinc-500">
+                        Disponível apenas na primeira assinatura desta escola.
+                      </div>
+                    ) : null}
+                  </div>
+
                   <div
                     className={
                       "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +

@@ -7,6 +7,7 @@ import { requireStaff } from "@/lib/require-staff";
 import { decodeMsg } from "@/lib/flash";
 import {
   getEffectiveAccess,
+  getSchoolSubscription,
 } from "@/lib/billing";
 
 export default async function DashboardPage({
@@ -18,8 +19,9 @@ export default async function DashboardPage({
   const sp = (await searchParams) ?? {};
   const isDirector = profile.role === "director";
 
-  const selectedPlan = ((): "monthly" | "yearly" => {
+  const selectedPlan = ((): "trial" | "monthly" | "yearly" => {
     const p = typeof sp.plan === "string" ? sp.plan : "";
+    if (p === "trial") return "trial";
     return p === "yearly" ? "yearly" : "monthly";
   })();
 
@@ -36,6 +38,11 @@ export default async function DashboardPage({
   });
   const active = access.active;
   const navSections = getNavSections({ subscribed: active });
+
+  // Usado apenas para exibir/desabilitar o card de teste grátis no dashboard bloqueado.
+  // A regra de verdade continua sendo aplicada em /billing (server action).
+  const sub = await getSchoolSubscription(supabase as any, profile.school_id);
+  const hasEverSubscribed = Boolean(sub?.stripe_subscription_id || sub?.status);
 
   return (
     <Shell
@@ -64,7 +71,7 @@ export default async function DashboardPage({
                   <div>
                     <div className="text-base font-semibold">Plano Profissional</div>
                     <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                      Escolha mensal ou anual para liberar cadastros, grade e relatórios.
+                      Escolha uma opção para liberar cadastros, grade e relatórios.
                     </div>
                   </div>
                   <div className="text-xs text-zinc-500">Checkout seguro via Stripe.</div>
@@ -76,7 +83,37 @@ export default async function DashboardPage({
                   <li>Relatórios (turma/sala/professor/hora atividade)</li>
                 </ul>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div
+                    className={
+                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
+                      (selectedPlan === "trial"
+                        ? "border-zinc-900 dark:border-white"
+                        : "border-zinc-200 dark:border-zinc-900")
+                    }
+                  >
+                    <div className="text-sm font-semibold">Teste grátis</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight">
+                      {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias
+                    </div>
+                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      R$ 0 no período de teste. Cartão obrigatório. Cobrança após o trial no plano mensal.
+                    </div>
+                    {hasEverSubscribed ? (
+                      <div
+                        className="btn btn-primary mt-4 w-full opacity-50 cursor-not-allowed"
+                        title="Teste grátis disponível apenas na primeira assinatura do colégio."
+                        aria-disabled="true"
+                      >
+                        Teste já utilizado
+                      </div>
+                    ) : (
+                      <Link className="btn btn-primary mt-4 w-full" href="/billing?plan=trial">
+                        Começar teste grátis
+                      </Link>
+                    )}
+                  </div>
+
                   <div
                     className={
                       "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +

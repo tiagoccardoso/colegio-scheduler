@@ -16,7 +16,7 @@ function Feature({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PlanCards({ onPick }: { onPick: (plan: "monthly" | "yearly") => void }) {
+function PlanCards({ onPick }: { onPick: (plan: "trial" | "monthly" | "yearly") => void }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
       <div className="text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -39,7 +39,19 @@ function PlanCards({ onPick }: { onPick: (plan: "monthly" | "yearly") => void })
           A liberação do sistema acontece após a confirmação da assinatura (checkout Stripe).
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+            <div className="text-sm font-semibold">Teste grátis</div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight">
+              {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias
+            </div>
+            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+              R$ 0 no período de teste. Cartão obrigatório. Cobrança após o trial no plano mensal.
+            </div>
+            <button type="button" onClick={() => onPick("trial")} className="btn btn-primary mt-4 w-full">
+              Começar teste grátis
+            </button>
+          </div>
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
             <div className="text-sm font-semibold">Mensal</div>
             <div className="mt-1 text-2xl font-semibold tracking-tight">
@@ -95,12 +107,13 @@ export default function LoginPage() {
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [redirectAfterLogin, setRedirectAfterLogin] = useState("/dashboard");
 
-  function pickPlan(plan: "monthly" | "yearly") {
+  function pickPlan(plan: "trial" | "monthly" | "yearly") {
     // Após entrar, o usuário cai no dashboard com o menu travado e os planos visíveis.
     // A contratação em si acontece em /billing.
     setRedirectAfterLogin(`/dashboard?plan=${plan}`);
     setMode("login");
-    setInfoMsg(`Faça login para escolher e concluir a assinatura ${plan === "yearly" ? "anual" : "mensal"}.`);
+    const label = plan === "trial" ? "com teste grátis" : plan === "yearly" ? "anual" : "mensal";
+    setInfoMsg(`Faça login para escolher e concluir a assinatura ${label}.`);
     setErrorMsg(null);
     try {
       document.getElementById("auth-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
