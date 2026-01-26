@@ -26,17 +26,17 @@ function PlanCards({ onPick }: { onPick: (plan: "trial" | "monthly" | "yearly") 
       <div className="mt-3">
         <div className="text-base font-semibold">Planos</div>
         <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-          Acesso completo ao gerador de grade, cadastros e relatórios.
+          Acesso completo à plataforma de organização de horários com inteligência artificial.
         </div>
 
         <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
           <li>Cadastros ilimitados</li>
-          <li>Montagem de grade com revisão de conflitos</li>
-          <li>Relatórios</li>
+          <li>Grade gerada com apoio da IA</li>
+          <li>Conflitos identificados e resolvidos</li>
         </ul>
 
         <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-          A liberação do sistema acontece após a confirmação da assinatura (checkout Stripe).
+          O acesso completo é liberado imediatamente após a confirmação da assinatura.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -181,22 +181,22 @@ export default function LoginPage() {
     <div className="page-container py-12">
       <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
         <section className="hidden lg:block">
-          <div className="badge w-fit">Organização sem drama</div>
+          <div className="badge w-fit">Organização escolar sem conflitos</div>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             ClassFlow
           </h1>
           <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
-            Um painel leve para cadastrar (Disciplinas, Salas, Turmas, Horários, Professores) e montar a grade com mais clareza.
+            A plataforma com inteligência artificial para organizar horários e montar grades escolares sem conflitos.
           </p>
 
           <ul className="mt-6 grid gap-3">
-            <Feature>Cadastre o essencial em poucos passos</Feature>
-            <Feature>Monte a grade geral do turno e revise conflitos</Feature>
-            <Feature>Imprima e compartilhe com a equipe</Feature>
+            <Feature>Cadastros simples e rápidos</Feature>
+            <Feature>Grade escolar gerada automaticamente</Feature>
+            <Feature>Conflitos identificados e resolvidos com IA</Feature>
           </ul>
 
           <p className="mt-8 text-sm text-zinc-600 dark:text-zinc-400">
-            Dica nerd: mantenha o cadastro de horários consistente (início/fim) para deixar o motor de grade bem feliz.
+            Dica nerd: Horários bem definidos deixam a IA ainda mais eficiente na montagem da grade.
           </p>
 
           {/* Planos de assinatura — alinhados à esquerda (desktop) */}

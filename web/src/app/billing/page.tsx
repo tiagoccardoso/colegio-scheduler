@@ -274,18 +274,18 @@ export default async function BillingPage({
                     <div>
                       <div className="text-base font-semibold">Planos</div>
                       <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                        Acesso completo ao gerador de grade e relatórios.
+                        Acesso completo à plataforma de organização de horários com inteligência artificial.
                         <span className="block mt-1 text-xs text-zinc-500">Primeira assinatura ganha teste grátis de {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias (cartão obrigatório).</span>
                       </div>
                     </div>
                     <div className="text-xs text-zinc-500">
-                      Escolha mensal ou anual para continuar.
+                      A plataforma com inteligência artificial para organizar horários e montar grades escolares sem conflitos.
                     </div>
                   </div>
                   <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
                     <li>Cadastros ilimitados</li>
-                    <li>Montagem de grade com revisão de conflitos</li>
-                    <li>Relatórios</li>
+                    <li>Grade gerada com apoio da IA</li>
+                    <li>Conflitos identificados e resolvidos</li>
                   </ul>
                 </div>
 
