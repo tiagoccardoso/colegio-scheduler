@@ -1,8 +1,8 @@
 import Link from 'next/link'
+import { APP_URL } from '@/lib/app-url'
 
 export function SiteFooter() {
   const year = new Date().getFullYear()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seusistema.vercel.app'
 
   return (
     <footer className="border-t border-black/5 bg-white/70 backdrop-blur">
@@ -26,7 +26,7 @@ export function SiteFooter() {
                 <li><Link className="text-zinc-600 hover:text-zinc-900" href="/produto">Visão geral</Link></li>
                 <li><Link className="text-zinc-600 hover:text-zinc-900" href="/planos">Planos</Link></li>
                 <li><Link className="text-zinc-600 hover:text-zinc-900" href="/treinamentos">Treinamentos</Link></li>
-                <li><Link className="text-zinc-600 hover:text-zinc-900" href={appUrl}>Acessar sistema</Link></li>
+                <li><a className="text-zinc-600 hover:text-zinc-900" href={APP_URL}>Acessar sistema</a></li>
               </ul>
             </div>
             <div>

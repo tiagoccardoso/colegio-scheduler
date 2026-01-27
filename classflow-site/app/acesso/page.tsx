@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
+import { APP_URL } from '@/lib/app-url'
 
 export const metadata = { title: 'Acesso' }
 
 export default function AcessoPage() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seusistema.vercel.app'
-  redirect(appUrl)
+  redirect(APP_URL)
 }

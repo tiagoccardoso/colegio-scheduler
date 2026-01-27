@@ -1,13 +1,11 @@
-import { Badge, Card, PrimaryButton, SecondaryButton } from '@/components/ui'
+import { Badge, Card } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
 
 export const metadata = { title: 'Planos' }
 
-export default function PlanosPage() {
-  const monthly = process.env.NEXT_PUBLIC_STRIPE_MONTHLY_URL || '#'
-  const yearly = process.env.NEXT_PUBLIC_STRIPE_YEARLY_URL || '#'
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seusistema.vercel.app'
+const PLANS_LOGIN_URL = 'https://www.classflow.app.br/login'
 
+export default function PlanosPage() {
   return (
     <div>
       <Section className="pt-4">
@@ -17,20 +15,27 @@ export default function PlanosPage() {
           description="Acesso completo ao gerador de grade, cadastros, detecção e resolução de conflitos e relatórios."
         />
 
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <PricingCard
+            title="Teste grátis"
+            price="7 dias"
+            note="Experimente sem custo por 7 dias. Após o período de teste, a cobrança continua no plano mensal (R$ 39,90/mês)."
+            ctaHref={PLANS_LOGIN_URL}
+            ctaLabel="Começar teste"
+            badge="Comece aqui"
+          />
           <PricingCard
             title="Mensal"
             price="R$ 39,90"
             note="Renovação automática. Cancele quando quiser."
-            ctaHref={monthly}
+            ctaHref={PLANS_LOGIN_URL}
             ctaLabel="Assinar mensal"
-            highlight={false}
           />
           <PricingCard
             title="Anual"
             price="R$ 383,05"
             note="Economize e ganhe previsibilidade o ano todo."
-            ctaHref={yearly}
+            ctaHref={PLANS_LOGIN_URL}
             ctaLabel="Assinar anual"
             highlight
           />
@@ -42,22 +47,22 @@ export default function PlanosPage() {
             <p className="mt-2 text-sm text-zinc-600">Professores, turmas, disciplinas, salas e horários sem limites.</p>
           </Card>
           <Card>
-            <div className="text-sm font-semibold text-zinc-900">IA para organizar e resolver</div>
-            <p className="mt-2 text-sm text-zinc-600">Sugestões em português, ações clicáveis e botão “Aplicar todas”.</p>
+            <div className="text-sm font-semibold text-zinc-900">IA para critérios e conflitos</div>
+            <p className="mt-2 text-sm text-zinc-600">
+              A IA interpreta preferências, detecta conflitos e propõe soluções para aplicar em um clique.
+            </p>
           </Card>
           <Card>
-            <div className="text-sm font-semibold text-zinc-900">Relatórios prontos</div>
-            <p className="mt-2 text-sm text-zinc-600">Por turma, professor e sala — pronto para imprimir e compartilhar.</p>
+            <div className="text-sm font-semibold text-zinc-900">Relatórios e auditoria</div>
+            <p className="mt-2 text-sm text-zinc-600">
+              Relatórios para acompanhar decisões, exceções e histórico de alterações na grade.
+            </p>
           </Card>
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center gap-3">
-          <PrimaryButton href={appUrl}>Acessar sistema</PrimaryButton>
-          <SecondaryButton href="/contato">Falar com a equipe</SecondaryButton>
-        </div>
-
-        <p className="mt-4 text-xs text-zinc-500">
-          A liberação do sistema acontece após a confirmação da assinatura (checkout Stripe).
+        <p className="mt-10 text-sm text-zinc-600">
+          Ao clicar em um plano, você será direcionado para o login do ClassFlow para criar sua conta e concluir a
+          assinatura (ou iniciar o teste grátis).
         </p>
       </Section>
     </div>
@@ -71,16 +76,19 @@ function PricingCard(props: {
   ctaHref: string
   ctaLabel: string
   highlight?: boolean
+  badge?: string
 }) {
+  const hasEmphasis = Boolean(props.highlight || props.badge)
+
   return (
-    <Card className={props.highlight ? 'border-brand-200 bg-white' : ''}>
+    <Card className={hasEmphasis ? 'border-brand-200 bg-white' : ''}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-zinc-900">{props.title}</div>
           <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">{props.price}</div>
           <p className="mt-2 text-sm text-zinc-600">{props.note}</p>
         </div>
-        {props.highlight ? <Badge>Mais escolhido</Badge> : null}
+        {props.badge ? <Badge>{props.badge}</Badge> : props.highlight ? <Badge>Mais escolhido</Badge> : null}
       </div>
 
       <ul className="mt-6 space-y-2 text-sm text-zinc-600">
@@ -99,13 +107,6 @@ function PricingCard(props: {
           {props.ctaLabel}
         </a>
       </div>
-
-      {props.ctaHref === '#' ? (
-        <p className="mt-3 text-xs text-zinc-500">
-          Configure os links do checkout com <span className="font-semibold">NEXT_PUBLIC_STRIPE_MONTHLY_URL</span> e{' '}
-          <span className="font-semibold">NEXT_PUBLIC_STRIPE_YEARLY_URL</span>.
-        </p>
-      ) : null}
     </Card>
   )
 }

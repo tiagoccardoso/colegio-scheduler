@@ -1,11 +1,10 @@
 import { Card, PrimaryButton, SecondaryButton } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
+import { APP_URL } from '@/lib/app-url'
 
 export const metadata = { title: 'Produto' }
 
 export default function ProdutoPage() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seusistema.vercel.app'
-
   return (
     <div>
       <Section className="pt-4">
@@ -69,7 +68,7 @@ export default function ProdutoPage() {
           <PrimaryButton href="/planos">Ver planos</PrimaryButton>
           <SecondaryButton href="/treinamentos">Ver treinamentos</SecondaryButton>
           <a
-            href={appUrl}
+            href={APP_URL}
             className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
           >
             Acessar sistema

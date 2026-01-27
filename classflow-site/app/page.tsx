@@ -1,10 +1,9 @@
 import Link from 'next/link'
 import { Badge, Card, PrimaryButton, SecondaryButton } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
+import { APP_URL } from '@/lib/app-url'
 
 export default function HomePage() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seusistema.vercel.app'
-
   return (
     <div>
       <div className="grid items-center gap-10 py-12 md:grid-cols-2 md:py-16">
@@ -21,12 +20,12 @@ export default function HomePage() {
           <div className="mt-7 flex flex-wrap gap-3">
             <PrimaryButton href="/planos">Ver planos</PrimaryButton>
             <SecondaryButton href="/treinamentos">Treinamentos</SecondaryButton>
-            <Link
-              href={appUrl}
+            <a
+              href={APP_URL}
               className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
             >
               Acessar sistema
-            </Link>
+            </a>
           </div>
           <div className="mt-6 flex flex-wrap gap-3 text-xs text-zinc-500">
             <div className="rounded-xl border border-black/5 bg-white/70 px-3 py-2">Vercel</div>

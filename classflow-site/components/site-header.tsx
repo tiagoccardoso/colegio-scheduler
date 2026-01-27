@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { APP_URL } from '@/lib/app-url'
 
 const nav = [
   { href: '/produto', label: 'Produto' },
@@ -13,7 +14,6 @@ const nav = [
 
 export function SiteHeader() {
   const pathname = usePathname()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seusistema.vercel.app'
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/5 bg-white/70 backdrop-blur dark:bg-white/60">
@@ -52,12 +52,12 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
-            href={appUrl}
+          <a
+            href={APP_URL}
             className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 md:inline-flex"
           >
             Acessar sistema
-          </Link>
+          </a>
           <Link
             href="/planos"
             className="inline-flex h-10 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-soft hover:bg-brand-700"
