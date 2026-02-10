@@ -1,11 +1,10 @@
 import { Card, PrimaryButton } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
+import { CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
 
 export const metadata = { title: 'Contato' }
 
 export default function ContatoPage() {
-  const email = 'contato@classflow.app'
-
   return (
     <div>
       <Section className="pt-4">
@@ -22,18 +21,25 @@ export default function ContatoPage() {
               Envie sua mensagem com nome da escola, município, turno e quantidade aproximada de turmas.
             </p>
             <div className="mt-4">
-              <a className="text-sm font-semibold text-brand-700 hover:underline" href={`mailto:${email}`}>
-                {email}
+              <a className="text-sm font-semibold text-brand-700 hover:underline" href={`mailto:${CONTACT_EMAIL}`}>
+                {CONTACT_EMAIL}
               </a>
             </div>
           </Card>
 
           <Card>
-            <div className="text-sm font-semibold text-zinc-900">WhatsApp</div>
+            <div className="text-sm font-semibold text-zinc-900">Telefone / WhatsApp</div>
             <p className="mt-2 text-sm text-zinc-600">
-              Preferiu WhatsApp? Mande uma mensagem e a gente agenda uma demonstração.
+              Ligue ou mande uma mensagem no WhatsApp e a gente agenda uma demonstração.
             </p>
-            <div className="mt-4 text-sm font-semibold text-zinc-900">(00) 00000-0000</div>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold">
+              <a className="text-brand-700 hover:underline" href={CONTACT_TEL_URL}>
+                {CONTACT_PHONE_DISPLAY}
+              </a>
+              <a className="text-brand-700 hover:underline" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+                Abrir no WhatsApp
+              </a>
+            </div>
           </Card>
         </div>
 

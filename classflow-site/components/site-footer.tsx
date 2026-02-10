@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { APP_URL } from '@/lib/app-url'
+import { CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
 
 export function SiteFooter() {
   const year = new Date().getFullYear()
@@ -44,8 +45,22 @@ export function SiteFooter() {
               Para demonstração, implantação e dúvidas.
             </p>
             <div className="mt-3 space-y-2 text-sm">
-              <p className="text-zinc-700"><span className="font-semibold">E-mail:</span> contato@classflow.app</p>
-              <p className="text-zinc-700"><span className="font-semibold">WhatsApp:</span> (00) 00000-0000</p>
+              <p className="text-zinc-700">
+                <span className="font-semibold">E-mail:</span>{' '}
+                <a className="hover:underline" href={`mailto:${CONTACT_EMAIL}`}>
+                  {CONTACT_EMAIL}
+                </a>
+              </p>
+              <p className="text-zinc-700">
+                <span className="font-semibold">Telefone / WhatsApp:</span>{' '}
+                <a className="hover:underline" href={CONTACT_TEL_URL}>
+                  {CONTACT_PHONE_DISPLAY}
+                </a>
+                <span className="text-zinc-500"> · </span>
+                <a className="hover:underline" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+                  WhatsApp
+                </a>
+              </p>
             </div>
           </div>
         </div>

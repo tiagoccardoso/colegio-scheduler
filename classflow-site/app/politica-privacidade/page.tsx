@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui'
+import { CONTACT_EMAIL } from '@/lib/contact'
 
 export const metadata = { title: 'Política de Privacidade' }
 
@@ -24,7 +25,7 @@ export default function PrivacidadePage() {
           </p>
           <h2>Contato</h2>
           <p>
-            Para solicitações relacionadas à privacidade: contato@classflow.app.
+            Para solicitações relacionadas à privacidade: {CONTACT_EMAIL}.
           </p>
         </div>
       </Card>

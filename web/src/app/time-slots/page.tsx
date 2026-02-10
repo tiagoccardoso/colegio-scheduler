@@ -24,6 +24,7 @@ type TeacherRow = {
 type ShiftSettingRow = {
   shift: string | null;
   interval_minutes: number | null;
+  interval_after_period: number | null;
 };
 
 const WEEKDAYS: Record<number, string> = {
@@ -75,14 +76,20 @@ export default async function Page({
   // Optional table (created by db/shift_settings.sql)
   const { data: shiftSettings } = await supabase
     .from("shift_settings")
-    .select("shift,interval_minutes")
+    .select("shift,interval_minutes,interval_after_period")
     .eq("school_id", profile.school_id);
 
-  const intervalByShift = new Map<string, number>();
+  const intervalByShift = new Map<string, { minutes: number; afterPeriod: number }>();
   for (const r of ((shiftSettings as ShiftSettingRow[] | null) ?? [])) {
     const k = String(r.shift || "").toUpperCase();
-    const v = Number(r.interval_minutes ?? 0);
-    if (k) intervalByShift.set(k, Number.isFinite(v) ? v : 0);
+    const minutes = Number(r.interval_minutes ?? 0);
+    const afterPeriod = Number(r.interval_after_period ?? 0);
+    if (!k) continue;
+
+    intervalByShift.set(k, {
+      minutes: Number.isFinite(minutes) ? Math.max(0, minutes) : 0,
+      afterPeriod: Number.isFinite(afterPeriod) ? Math.max(0, afterPeriod) : 0,
+    });
   }
 
   async function createAction(formData: FormData) {
@@ -177,7 +184,6 @@ export default async function Page({
     const duration = Math.max(1, Number(formData.get("g_duration")) || 50);
 
     const useShiftInterval = String(formData.get("g_use_shift_interval") || "") === "on";
-    const manualGap = Math.max(0, Number(formData.get("g_gap")) || 0);
 
     const periods = Math.min(
       maxPeriodsForShift(shift),
@@ -192,11 +198,13 @@ export default async function Page({
     if (!start) redirect("/time-slots?error=" + encodeMsg("Horário inicial inválido."));
     if (weekdays.length === 0) redirect("/time-slots?error=" + encodeMsg("Selecione pelo menos um dia."));
 
-    let gap = manualGap;
+    let intervalMinutes = 0;
+    let intervalAfterPeriod = 0;
+
     if (useShiftInterval) {
       const { data: ss, error: ssErr } = await supabase
         .from("shift_settings")
-        .select("interval_minutes")
+        .select("interval_minutes,interval_after_period")
         .eq("school_id", profile.school_id)
         .eq("shift", shift)
         .maybeSingle();
@@ -208,7 +216,9 @@ export default async function Page({
             ),
         );
       }
-      gap = Math.max(0, Number((ss as any)?.interval_minutes ?? 0));
+
+      intervalMinutes = Math.max(0, Number((ss as any)?.interval_minutes ?? 0));
+      intervalAfterPeriod = Math.max(0, Number((ss as any)?.interval_after_period ?? 0));
     }
 
     function addMinutes(hhmm: string, minutes: number) {
@@ -226,8 +236,10 @@ export default async function Page({
     const payload: any[] = [];
     for (const weekday of Array.from(new Set(weekdays))) {
       for (let p = 1; p <= periods; p++) {
-        const starts_at = addMinutes(start, (p - 1) * (duration + gap));
-        const ends_at = addMinutes(start, (p - 1) * (duration + gap) + duration);
+        const intervalOffset =
+          intervalMinutes > 0 && intervalAfterPeriod > 0 && p > intervalAfterPeriod ? intervalMinutes : 0;
+        const starts_at = addMinutes(start, (p - 1) * duration + intervalOffset);
+        const ends_at = addMinutes(start, (p - 1) * duration + intervalOffset + duration);
         payload.push({
           school_id: profile.school_id,
           shift,
@@ -284,13 +296,49 @@ export default async function Page({
 
     const shift = String(formData.get("ss_shift") || "MANHA").trim().toUpperCase();
     const interval = Math.max(0, Math.min(180, Number(formData.get("ss_interval")) || 0));
+    const afterPeriodRaw = Number(formData.get("ss_after_period")) || 0;
+    const maxPeriods = maxPeriodsForShift(shift);
+    const afterPeriod = Math.max(0, Math.min(maxPeriods, Math.floor(afterPeriodRaw)));
 
     if (!SHIFT_OPTIONS.some((s) => s.key === shift)) redirect("/time-slots?error=" + encodeMsg("Turno inválido."));
+
+    if (afterPeriodRaw !== afterPeriod) {
+      redirect(
+        "/time-slots?error=" +
+          encodeMsg(`Período inválido para iniciar o intervalo (0..${maxPeriods}).`),
+      );
+    }
+
+    // Read previous settings (so we can adjust existing time slots without cumulative drift)
+    let oldInterval = 0;
+    let oldAfterPeriod = 0;
+    const { data: oldSS, error: oldErr } = await supabase
+      .from("shift_settings")
+      .select("interval_minutes,interval_after_period")
+      .eq("school_id", profile.school_id)
+      .eq("shift", shift)
+      .maybeSingle();
+    if (oldErr) {
+      redirect(
+        "/time-slots?error=" +
+          encodeMsg(
+            "Não foi possível ler o intervalo do turno. Rode db/shift_settings.sql no Supabase.",
+          ),
+      );
+    }
+
+    oldInterval = Math.max(0, Number((oldSS as any)?.interval_minutes ?? 0));
+    oldAfterPeriod = Math.max(0, Number((oldSS as any)?.interval_after_period ?? 0));
 
     const { error } = await supabase
       .from("shift_settings")
       .upsert(
-        { school_id: profile.school_id, shift, interval_minutes: interval },
+        {
+          school_id: profile.school_id,
+          shift,
+          interval_minutes: interval,
+          interval_after_period: afterPeriod,
+        },
         { onConflict: "school_id,shift" },
       );
 
@@ -303,8 +351,76 @@ export default async function Page({
       );
     }
 
+    // Update existing time slots for this shift: periods after the interval start are shifted.
+    // We apply (newOffset - oldOffset) per period to avoid cumulative drift.
+    const offsetFor = (minutes: number, afterP: number, periodIndex: number) =>
+      minutes > 0 && afterP > 0 && periodIndex > afterP ? minutes : 0;
+
+    const parseTime = (hhmmss: string) => {
+      const [hRaw, mRaw] = String(hhmmss || "").split(":");
+      const h = Number(hRaw);
+      const m = Number(mRaw);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+      return h * 60 + m;
+    };
+
+    const formatTime = (totalMinutes: number) => {
+      const total = (totalMinutes + 24 * 60) % (24 * 60);
+      const hh = Math.floor(total / 60);
+      const mm = total % 60;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${pad(hh)}:${pad(mm)}`;
+    };
+
+    const addMinutes = (hhmmss: string, add: number) => {
+      const base = parseTime(hhmmss);
+      if (base == null) return hhmmss;
+      return formatTime(base + add);
+    };
+
+    const { data: slotRows, error: slotErr } = await supabase
+      .from("time_slots")
+      .select("id,weekday,shift,period_index,starts_at,ends_at")
+      .eq("school_id", profile.school_id)
+      .eq("shift", shift);
+    if (slotErr) redirect("/time-slots?error=" + encodeMsg(slotErr.message));
+
+    const updates: any[] = [];
+    for (const r of ((slotRows as any[] | null) ?? [])) {
+      const id = String((r as any).id || "");
+      const wd = Number((r as any).weekday);
+      const pi = Number((r as any).period_index);
+      if (!id || !Number.isFinite(wd) || !Number.isFinite(pi)) continue;
+
+      const oldOff = offsetFor(oldInterval, oldAfterPeriod, pi);
+      const newOff = offsetFor(interval, afterPeriod, pi);
+      const delta = newOff - oldOff;
+      if (delta === 0) continue;
+
+      updates.push({
+        id,
+        school_id: profile.school_id,
+        shift,
+        weekday: wd,
+        period_index: pi,
+        starts_at: addMinutes(String((r as any).starts_at || ""), delta),
+        ends_at: addMinutes(String((r as any).ends_at || ""), delta),
+      });
+    }
+
+    if (updates.length) {
+      const { error: upErr } = await supabase
+        .from("time_slots")
+        .upsert(updates, { onConflict: "id" });
+      if (upErr) redirect("/time-slots?error=" + encodeMsg(upErr.message));
+    }
+
     revalidatePath("/time-slots");
-    redirect("/time-slots?msg=" + encodeMsg("Intervalo do turno salvo."));
+    revalidatePath("/weekly-grade");
+    redirect(
+      "/time-slots?msg=" +
+        encodeMsg(updates.length ? "Intervalo do turno salvo e horários ajustados." : "Intervalo do turno salvo."),
+    );
   }
 
   async function resetAllPeriodsAction(formData: FormData) {
@@ -492,8 +608,9 @@ export default async function Page({
   const teachersTyped = (teachers as TeacherRow[] | null) ?? [];
 
   const ssSummary = SHIFT_OPTIONS.map((s) => {
-    const v = intervalByShift.get(s.key) ?? 0;
-    return `${s.label}: ${v} min`;
+    const cfg = intervalByShift.get(s.key) ?? { minutes: 0, afterPeriod: 0 };
+    if (cfg.minutes > 0 && cfg.afterPeriod > 0) return `${s.label}: ${cfg.minutes} min após ${cfg.afterPeriod}º`;
+    return `${s.label}: sem intervalo`;
   }).join(" · ");
 
   return (
@@ -626,7 +743,7 @@ export default async function Page({
                   </div>
                 </fieldset>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <label className="grid gap-2">
                     <span className="text-sm font-semibold">Início</span>
                     <input
@@ -644,16 +761,6 @@ export default async function Page({
                       type="number"
                       min={1}
                       defaultValue={50}
-                      className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="text-sm font-semibold">Intervalo (min)</span>
-                    <input
-                      name="g_gap"
-                      type="number"
-                      min={0}
-                      defaultValue={0}
                       className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
                     />
                   </label>
@@ -713,17 +820,35 @@ export default async function Page({
                   </select>
                 </label>
 
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Intervalo (min)</span>
-                  <input
-                    name="ss_interval"
-                    type="number"
-                    min={0}
-                    max={180}
-                    defaultValue={0}
-                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                  />
-                </label>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-sm font-semibold">Intervalo (min)</span>
+                    <input
+                      name="ss_interval"
+                      type="number"
+                      min={0}
+                      max={180}
+                      defaultValue={0}
+                      className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                    />
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-sm font-semibold">Inicia após o período</span>
+                    <input
+                      name="ss_after_period"
+                      type="number"
+                      min={0}
+                      max={6}
+                      defaultValue={0}
+                      className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                    />
+                  </label>
+                </div>
+
+                <span className="text-xs text-zinc-500">
+                  Ex.: <strong>10</strong> min iniciando após o <strong>3º</strong> período → o <strong>4º</strong> e os seguintes começam 10 min mais tarde.
+                </span>
 
                 <button
                   type="submit"
