@@ -55,6 +55,9 @@ alter table public.time_slots
 alter table public.teachers
   add column if not exists workload_20h_blocks smallint not null default 1;
 
+alter table public.teachers
+  add column if not exists allow_interjornada_lt_11 boolean not null default false;
+
 do $$
 begin
   if not exists (
@@ -141,6 +144,7 @@ language plpgsql
 as $$
 declare
   ts_new record;
+  teacher_allows_interjornada_lt_11 boolean := false;
   other record;
   prev_day int;
   next_day int;
@@ -154,6 +158,16 @@ begin
     into ts_new
   from public.time_slots ts
   where ts.id = new.time_slot_id;
+
+  select coalesce(t.allow_interjornada_lt_11, false)
+    into teacher_allows_interjornada_lt_11
+  from public.teachers t
+  where t.id = new.teacher_id
+    and t.school_id = new.school_id;
+
+  if not found then
+    teacher_allows_interjornada_lt_11 := false;
+  end if;
 
   if not found then
     raise exception 'Horário (time_slot_id=%) não encontrado.', new.time_slot_id;
@@ -203,7 +217,7 @@ begin
 
   -- Se está inserindo/atualizando MANHA: verifica NOITE do dia anterior
   if upper(coalesce(ts_new.shift::text, '')) = 'MANHA' then
-    if exists (
+    if (not teacher_allows_interjornada_lt_11) and exists (
       select 1
       from public.schedules s_prev
       join public.time_slots ts_prev on ts_prev.id = s_prev.time_slot_id
@@ -222,7 +236,7 @@ begin
 
   -- Se está inserindo/atualizando NOITE: verifica MANHA do dia seguinte
   if upper(coalesce(ts_new.shift::text, '')) = 'NOITE' then
-    if exists (
+    if (not teacher_allows_interjornada_lt_11) and exists (
       select 1
       from public.schedules s_next
       join public.time_slots ts_next on ts_next.id = s_next.time_slot_id

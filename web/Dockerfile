@@ -28,6 +28,11 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 # next.config.* is optional
-COPY --from=builder /app/next.config.* ./ 2>/dev/null || true
+COPY --from=builder /app/public ./public
+
+# Remover a linha opcional do next.config.*
 EXPOSE 3000
 CMD ["npm","run","start","--","-H","0.0.0.0","-p","3000"]
+
+
+

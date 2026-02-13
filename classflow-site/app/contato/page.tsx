@@ -1,6 +1,6 @@
 import { Card, PrimaryButton } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
-import { CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
+import { CONTACT_ADDRESS, CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
 
 export const metadata = { title: 'Contato' }
 
@@ -40,6 +40,11 @@ export default function ContatoPage() {
                 Abrir no WhatsApp
               </a>
             </div>
+          </Card>
+
+          <Card>
+            <div className="text-sm font-semibold text-zinc-900">Endereço</div>
+            <p className="mt-2 text-sm text-zinc-600">{CONTACT_ADDRESS}</p>
           </Card>
         </div>
 

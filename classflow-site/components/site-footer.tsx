@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { APP_URL } from '@/lib/app-url'
-import { CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
+import { CONTACT_ADDRESS, CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
 
 export function SiteFooter() {
   const year = new Date().getFullYear()
@@ -14,10 +14,6 @@ export function SiteFooter() {
             <p className="mt-2 text-sm text-zinc-600">
               A inteligência artificial auxilia na organização das regras da escola e monta automaticamente uma grade de horários sem conflitos.
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900">
-              <span className="h-2 w-2 rounded-full bg-brand-600" />
-              Funcionando bem na Vercel + Supabase + Stripe
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -61,13 +57,16 @@ export function SiteFooter() {
                   WhatsApp
                 </a>
               </p>
+              <p className="text-zinc-700">
+                <span className="font-semibold">Endereço:</span>{' '}
+                {CONTACT_ADDRESS}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="mt-10 flex flex-col gap-2 border-t border-black/5 pt-6 text-xs text-zinc-500 md:flex-row md:items-center md:justify-between">
           <p>© {year} ClassFlow. Todos os direitos reservados.</p>
-          <p>Feito para deixar o motor de grade bem feliz.</p>
         </div>
       </div>
     </footer>

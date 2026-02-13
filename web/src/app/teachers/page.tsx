@@ -19,6 +19,7 @@ type Row = {
   class_ids: string[] | null;
   restrictions: string | null;
   availability: any | null;
+  allow_interjornada_lt_11?: boolean | null;
 
   teaching_rules?: any | null;
 
@@ -51,13 +52,15 @@ export default async function Page({
   // Usado por telas auxiliares (ex.: Conflitos) para abrir direto o professor.
   const focusId = typeof (sp as any)?.focus === "string" ? String((sp as any).focus) : null;
 
+  const q = typeof (sp as any)?.q === "string" ? String((sp as any).q).trim() : "";
+
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
   const { data: rows, error: loadError } = await supabase
     .from("teachers")
     .select(
-      "id,name,email,shifts,subject_id,default_room_id,class_ids,restrictions,availability,teaching_rules,subject_ids,room_ids,available_weekdays",
+      "id,name,email,shifts,subject_id,default_room_id,class_ids,restrictions,availability,allow_interjornada_lt_11,teaching_rules,subject_ids,room_ids,available_weekdays",
     )
     .eq("school_id", profile.school_id)
     .order("created_at", { ascending: false });
@@ -113,6 +116,7 @@ export default async function Page({
       short_name: String(formData.get("short_name") || "").trim() || null,
       email: String(formData.get("email") || "").trim() || null,
       restrictions: criteria || null,
+      allow_interjornada_lt_11: Boolean(formData.get("allow_interjornada_lt_11")),
 
       teaching_rules: parsedRules,
 
@@ -157,6 +161,7 @@ export default async function Page({
       short_name: String(formData.get("short_name") || "").trim() || null,
       email: String(formData.get("email") || "").trim() || null,
       restrictions: criteria || null,
+      allow_interjornada_lt_11: Boolean(formData.get("allow_interjornada_lt_11")),
 
       teaching_rules: parsedRules,
 
@@ -192,9 +197,38 @@ export default async function Page({
 
     revalidatePath("/teachers");
     redirect("/teachers?msg=" + encodeMsg("Professor removido."));
+
+  }
+
+  async function deleteAllAction() {
+    "use server";
+    const { supabase, profile } = await requireStaff();
+
+    // Primeiro, "desvincula" professores de aulas existentes (evita falha por FK, se houver)
+    const { error: unassignError } = await supabase
+      .from("schedules")
+      .update({ teacher_id: null })
+      .eq("school_id", profile.school_id);
+
+    if (unassignError) redirect("/teachers?error=" + encodeMsg(unassignError.message));
+
+    const { error } = await supabase.from("teachers").delete().eq("school_id", profile.school_id);
+    if (error) redirect("/teachers?error=" + encodeMsg(error.message));
+
+    revalidatePath("/teachers");
+    redirect("/teachers?msg=" + encodeMsg("Todos os professores foram removidos."));
+
   }
 
   const rowsTyped = (rows as Row[] | null) ?? [];
+
+  const qNorm = q.toLowerCase();
+  const filteredRows = qNorm
+    ? rowsTyped.filter((r) => {
+        const hay = `${r.name ?? ""} ${r.short_name ?? ""} ${r.email ?? ""}`.toLowerCase();
+        return hay.includes(qNorm);
+      })
+    : rowsTyped;
 
   return (
     <Shell title="Professores">
@@ -245,18 +279,80 @@ export default async function Page({
                 />
               </label>
 
+
+              <label className="flex items-center gap-2">
+                <input
+                  name="allow_interjornada_lt_11"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-950"
+                />
+                <span className="text-sm font-medium">Permitir Interjornada inferior a 11 horas</span>
+              </label>
+
+
+
               <button
                 type="submit"
                 className="w-fit rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 Salvar
               </button>
+
             </form>
           </details>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-          <div className="overflow-x-auto">
+          
+          <div className="flex flex-col gap-3 border-b border-zinc-100 p-4 dark:border-zinc-900 md:flex-row md:items-center md:justify-between">
+            <form action="/teachers" method="get" className="flex w-full flex-col gap-2 md:max-w-xl md:flex-row md:items-center">
+              <label className="grid w-full gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pesquisar professor</span>
+                <input
+                  name="q"
+                  type="text"
+                  defaultValue={q}
+                  placeholder="Digite nome ou e-mail..."
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+                />
+              </label>
+              <div className="flex gap-2 md:mt-5">
+                <button
+                  type="submit"
+                  className="h-10 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  Buscar
+                </button>
+                {q ? (
+                  <a
+                    href="/teachers"
+                    className="inline-flex h-10 items-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
+                  >
+                    Limpar
+                  </a>
+                ) : null}
+              </div>
+            </form>
+
+            <div className="flex flex-col gap-2 md:items-end">
+              <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                Exibindo <span className="font-semibold">{filteredRows.length}</span> de{" "}
+                <span className="font-semibold">{rowsTyped.length}</span>
+              </div>
+
+              <form action={deleteAllAction}>
+                <ConfirmButton
+                  confirmText="Isso vai excluir TODOS os professores cadastrados. Deseja continuar?"
+                  type="submit"
+                  className="btn btn-danger"
+                >
+                  Excluir todos
+                </ConfirmButton>
+              </form>
+            </div>
+          </div>
+
+<div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>
                 <tr>
@@ -270,7 +366,7 @@ export default async function Page({
                 </tr>
               </thead>
               <tbody>
-                {rowsTyped.map((row) => {
+                {filteredRows.map((row) => {
                   const subjectsLabel = row.subject_id
                     ? subjectById.get(row.subject_id) || row.subject_id
                     : labelList(row.subject_ids, subjectById, "—");
@@ -370,7 +466,7 @@ export default async function Page({
                   );
                 })}
 
-                {rowsTyped.length === 0 ? (
+                {filteredRows.length === 0 ? (
                   <tr className="border-t border-zinc-100 dark:border-zinc-900">
                     <td colSpan={7} className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-400">
                       Nenhum registro encontrado.
