@@ -26,14 +26,28 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
+  const qRaw = typeof sp.q === "string" ? sp.q : "";
+  const q = qRaw.trim().replace(/,/g, " ");
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+  const like = `%${q}%`;
 
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
-  const { data: rows, error: loadError } = await supabase
+  let classesQuery = supabase
     .from("classes")
     .select("id, name, shift, level, stage, default_room_id, display_order")
-    .eq("school_id", profile.school_id)
+    .eq("school_id", profile.school_id);
+
+  if (q) {
+    classesQuery = classesQuery.or(
+      isUuid
+        ? `id.eq.${q},name.ilike.${like},shift.ilike.${like},level.ilike.${like},stage.ilike.${like}`
+        : `name.ilike.${like},shift.ilike.${like},level.ilike.${like},stage.ilike.${like}`
+    );
+  }
+
+  const { data: rows, error: loadError } = await classesQuery
     .order("display_order", { ascending: true, nullsFirst: false })
     .order("name", { ascending: true });
 
@@ -101,6 +115,17 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     redirect("/classes?msg=" + encodeMsg("Turmas removida."));
   }
 
+  async function deleteAllAction() {
+    "use server";
+    const { supabase, profile } = await requireStaff();
+
+    const { error } = await supabase.from("classes").delete().eq("school_id", profile.school_id);
+    if (error) redirect("/classes?error=" + encodeMsg(error.message));
+
+    revalidatePath("/classes");
+    redirect("/classes?msg=" + encodeMsg("Todas as turmas foram removidas."));
+  }
+
   return (
     <Shell title="Turmas">
       <div className="grid gap-4">
@@ -149,6 +174,35 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+          <div className="flex flex-col gap-3 border-b border-zinc-100 p-4 dark:border-zinc-900 sm:flex-row sm:items-center sm:justify-between">
+            <form action="/classes" method="GET" className="flex w-full max-w-md gap-2">
+              <input
+                name="q"
+                type="text"
+                placeholder="Pesquisar por nome, turno (ou ID)"
+                defaultValue={q}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600"
+              />
+              <button type="submit" className="btn btn-secondary">
+                Pesquisar
+              </button>
+              {q ? (
+                <a href="/classes" className="btn btn-ghost">
+                  Limpar
+                </a>
+              ) : null}
+            </form>
+
+            <form action={deleteAllAction}>
+              <ConfirmButton
+                confirmText="Tem certeza que deseja excluir TODOS os registros?"
+                type="submit"
+                className="btn btn-danger"
+              >
+                Excluir todos
+              </ConfirmButton>
+            </form>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>

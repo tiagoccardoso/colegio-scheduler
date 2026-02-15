@@ -22,13 +22,24 @@ export default async function Page({
   const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
+  const qRaw = typeof sp.q === "string" ? sp.q : "";
+  const q = qRaw.trim().replace(/,/g, " ");
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+  const like = `%${q}%`;
+
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
-  const { data: rows, error: loadError } = await supabase
+  let roomsQuery = supabase
     .from("rooms")
     .select("id, name, room_type, room_number, display_order")
-    .eq("school_id", profile.school_id)
+    .eq("school_id", profile.school_id);
+
+  if (q) {
+    roomsQuery = roomsQuery.or(isUuid ? `id.eq.${q},name.ilike.${like},room_type.ilike.${like}` : `name.ilike.${like},room_type.ilike.${like}`);
+  }
+
+  const { data: rows, error: loadError } = await roomsQuery
     .order("display_order", { ascending: true, nullsFirst: false })
     .order("room_number", { ascending: true, nullsFirst: false })
     .order("name", { ascending: true });
@@ -91,6 +102,17 @@ export default async function Page({
     redirect("/rooms?msg=" + encodeMsg("Sala removida."));
   }
 
+  async function deleteAllAction() {
+    "use server";
+    const { supabase, profile } = await requireStaff();
+
+    const { error } = await supabase.from("rooms").delete().eq("school_id", profile.school_id);
+    if (error) redirect("/rooms?error=" + encodeMsg(error.message));
+
+    revalidatePath("/rooms");
+    redirect("/rooms?msg=" + encodeMsg("Todas as salas foram removidas."));
+  }
+
   const rowsTyped = (rows as Row[] | null) ?? [];
 
   return (
@@ -125,6 +147,35 @@ export default async function Page({
         </div>
 
         <div className="table-wrap">
+          <div className="flex flex-col gap-3 border-b border-zinc-100 p-4 dark:border-zinc-900 sm:flex-row sm:items-center sm:justify-between">
+            <form action="/rooms" method="GET" className="flex w-full max-w-md gap-2">
+              <input
+                name="q"
+                type="text"
+                placeholder="Pesquisar por nome, tipo (ou ID)"
+                defaultValue={q}
+                className="input w-full"
+              />
+              <button type="submit" className="btn btn-secondary">
+                Pesquisar
+              </button>
+              {q ? (
+                <a href="/rooms" className="btn btn-ghost">
+                  Limpar
+                </a>
+              ) : null}
+            </form>
+
+            <form action={deleteAllAction}>
+              <ConfirmButton
+                confirmText="Tem certeza que deseja excluir TODOS os registros?"
+                type="submit"
+                className="btn btn-danger"
+              >
+                Excluir todos
+              </ConfirmButton>
+            </form>
+          </div>
           <div className="overflow-x-auto">
             <table className="table">
               <thead>

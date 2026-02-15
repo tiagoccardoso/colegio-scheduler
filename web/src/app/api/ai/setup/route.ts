@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deriveLegacyFieldsFromTeachingRules } from "@/lib/schedule/teaching-rules";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,16 @@ type SetupPlan = {
 
 function asString(v: any) {
   return v == null ? "" : String(v);
+}
+
+function normalizeKey(v: any) {
+  // Normaliza nomes vindos do chat vs banco (acentos/maiúsculas/espaços)
+  return asString(v)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 function normalizeShift(v: any) {
@@ -135,13 +146,13 @@ async function applySetupPlan(opts: {
           .ilike("name", name)
           .maybeSingle();
         if (found?.id) {
-          subjectNameToId.set(name.toLowerCase(), found.id);
+          subjectNameToId.set(normalizeKey(name), found.id);
           warnings.push(`Disciplina '${name}' já existia (reutilizada).`);
           continue;
         }
         throw new Error(`Erro ao criar disciplina '${name}': ${error.message}`);
       }
-      if (data?.id) subjectNameToId.set(name.toLowerCase(), data.id);
+      if (data?.id) subjectNameToId.set(normalizeKey(name), data.id);
       execLog.push(`Disciplina criada: ${name}`);
     }
   }
@@ -152,14 +163,17 @@ async function applySetupPlan(opts: {
     .select("id,name,short_name")
     .eq("school_id", schoolId);
   for (const s of (subjectsExisting as any[]) ?? []) {
-    const n = asString(s?.name).trim().toLowerCase();
+    const n = normalizeKey(s?.name);
     if (n && s?.id) subjectNameToId.set(n, s.id);
-    const sn = asString(s?.short_name).trim().toLowerCase();
+    const sn = normalizeKey(s?.short_name);
     if (sn && s?.id) subjectNameToId.set(sn, s.id);
   }
 
   // 2) Rooms
   const roomNameToId = new Map<string, string>();
+  // Quando o fluxo é executado em etapas (salas cadastradas em uma etapa anterior),
+  // o plano atual pode não trazer `rooms`. Guardamos uma opção padrão do banco.
+  let firstRoomId: string | null = null;
   if (Array.isArray(plan.rooms) && plan.rooms.length) {
     for (const r of plan.rooms) {
       const name = asString((r as any).name).trim();
@@ -179,13 +193,13 @@ async function applySetupPlan(opts: {
           .ilike("name", name)
           .maybeSingle();
         if (found?.id) {
-          roomNameToId.set(name.toLowerCase(), found.id);
+          roomNameToId.set(normalizeKey(name), found.id);
           warnings.push(`Sala '${name}' já existia (reutilizada).`);
           continue;
         }
         throw new Error(`Erro ao criar sala '${name}': ${error.message}`);
       }
-      if (data?.id) roomNameToId.set(name.toLowerCase(), data.id);
+      if (data?.id) roomNameToId.set(normalizeKey(name), data.id);
       execLog.push(`Sala criada: ${name}`);
     }
   }
@@ -195,12 +209,14 @@ async function applySetupPlan(opts: {
     .select("id,name")
     .eq("school_id", schoolId);
   for (const r of (roomsExisting as any[]) ?? []) {
-    const n = asString(r?.name).trim().toLowerCase();
+    const n = normalizeKey(r?.name);
     if (n && r?.id) roomNameToId.set(n, r.id);
+    if (!firstRoomId && r?.id) firstRoomId = r.id;
   }
 
   // 3) Classes
   const classNameToId = new Map<string, string>();
+  let firstClassId: string | null = null;
   if (Array.isArray(plan.classes) && plan.classes.length) {
     for (const c of plan.classes) {
       const name = asString((c as any).name).trim();
@@ -219,13 +235,13 @@ async function applySetupPlan(opts: {
           .ilike("name", name)
           .maybeSingle();
         if (found?.id) {
-          classNameToId.set(name.toLowerCase(), found.id);
+          classNameToId.set(normalizeKey(name), found.id);
           warnings.push(`Turma '${name}' já existia (reutilizada).`);
           continue;
         }
         throw new Error(`Erro ao criar turma '${name}': ${error.message}`);
       }
-      if (data?.id) classNameToId.set(name.toLowerCase(), data.id);
+      if (data?.id) classNameToId.set(normalizeKey(name), data.id);
       execLog.push(`Turma criada: ${name} (${shift})`);
     }
   }
@@ -235,8 +251,9 @@ async function applySetupPlan(opts: {
     .select("id,name")
     .eq("school_id", schoolId);
   for (const c of (classesExisting as any[]) ?? []) {
-    const n = asString(c?.name).trim().toLowerCase();
+    const n = normalizeKey(c?.name);
     if (n && c?.id) classNameToId.set(n, c.id);
+    if (!firstClassId && c?.id) firstClassId = c.id;
   }
 
   // 4) Time slots
@@ -307,11 +324,12 @@ async function applySetupPlan(opts: {
       const subjects = (t as any).subjects ?? (t as any).subject_ids ?? [];
       if (Array.isArray(subjects)) {
         for (const s of subjects) {
-          const val = asString(s).trim();
+          // Pode vir como string ("Português") ou objeto ({ name: "Português" })
+          const val = asString(typeof s === "object" ? (s as any)?.name : s).trim();
           if (!val) continue;
           if (val.includes("-")) subject_ids.push(val);
           else {
-            const resolved = subjectNameToId.get(val.toLowerCase());
+            const resolved = subjectNameToId.get(normalizeKey(val));
             if (resolved) subject_ids.push(resolved);
           }
         }
@@ -332,12 +350,119 @@ async function applySetupPlan(opts: {
         const period_index = Number(r?.period_index);
         const weekdays = Array.isArray(r?.weekdays) ? r.weekdays.map((n: any) => Number(n)).filter(Boolean) : null;
 
-        const sid = subjectNameToId.get(subjectName.toLowerCase());
-        const rid = roomNameToId.get(roomName.toLowerCase());
-        const cid = classNameToId.get(className.toLowerCase());
+        const sid = subjectNameToId.get(normalizeKey(subjectName));
+        const rid = roomNameToId.get(normalizeKey(roomName));
+        const cid = classNameToId.get(normalizeKey(className));
         if (!sid || !rid || !cid || !period_index) continue;
         teaching_rules.push({ subject_id: sid, room_id: rid, class_id: cid, shift, period_index, weekdays });
       }
+
+      // Suporte a um formato mais simples vindo do chat:
+      // teachers: [{ name, subjects:["Matemática"], schedule:{"segunda":[1,2],"terça":[3]} , shift:"MANHÃ", class:"Turma A", room:"Sala 1" }]
+      // Se class/room não vierem, usamos defaults (e avisamos) para garantir que as telas/grade consigam trabalhar.
+      const schedule = (t as any).schedule;
+      if (schedule && typeof schedule === "object" && !Array.isArray(schedule)) {
+        const weekdayMap: Record<string, number> = {
+          "seg": 1,
+          "segunda": 1,
+          "segunda-feira": 1,
+          "ter": 2,
+          "terca": 2,
+          "terça": 2,
+          "terça-feira": 2,
+          "qua": 3,
+          "quarta": 3,
+          "quarta-feira": 3,
+          "qui": 4,
+          "quinta": 4,
+          "quinta-feira": 4,
+          "sex": 5,
+          "sexta": 5,
+          "sexta-feira": 5,
+        };
+
+        const teacherShift = normalizeShift((t as any).shift || (plan.buildSchedule as any)?.shift || (plan.classes?.[0] as any)?.shift || "MANHA");
+
+        // Resolve turma(s)
+        const classNamesRaw = (t as any).classes ?? (t as any).turmas ?? (t as any).class ?? (t as any).turma;
+        let classIds: string[] = [];
+        const classNames: string[] = Array.isArray(classNamesRaw)
+          ? classNamesRaw.map((x: any) => asString(x).trim()).filter(Boolean)
+          : [asString(classNamesRaw).trim()].filter(Boolean);
+        for (const cn of classNames) {
+          const cid = classNameToId.get(normalizeKey(cn));
+          if (cid) classIds.push(cid);
+        }
+        if (classIds.length === 0) {
+          // Fluxo em etapas: o plano atual pode não conter `classes`.
+          // Usa a primeira turma já cadastrada no banco para garantir que teaching_rules seja preenchido.
+          if (firstClassId) {
+            classIds = [firstClassId];
+            warnings.push(`Professor '${name}': turma não informada; usando a primeira turma cadastrada como padrão.`);
+          }
+        }
+
+        // Resolve sala(s)
+        const roomNamesRaw = (t as any).rooms ?? (t as any).salas ?? (t as any).room ?? (t as any).sala;
+        let roomIds: string[] = [];
+        const roomNames: string[] = Array.isArray(roomNamesRaw)
+          ? roomNamesRaw.map((x: any) => asString(x).trim()).filter(Boolean)
+          : [asString(roomNamesRaw).trim()].filter(Boolean);
+        for (const rn of roomNames) {
+          const rid = roomNameToId.get(normalizeKey(rn));
+          if (rid) roomIds.push(rid);
+        }
+        if (roomIds.length === 0) {
+          // Fluxo em etapas: o plano atual pode não conter `rooms`.
+          // Usa a primeira sala já cadastrada no banco para garantir que teaching_rules seja preenchido.
+          if (firstRoomId) {
+            roomIds = [firstRoomId];
+            warnings.push(`Professor '${name}': sala não informada; usando a primeira sala cadastrada como padrão.`);
+          }
+        }
+
+        // Resolve disciplina (se várias, usa a primeira e avisa)
+        const subjectId = subject_ids[0] || null;
+        if (!subjectId) {
+          warnings.push(`Professor '${name}': disciplinas ausentes; não foi possível gerar vínculos por horário.`);
+        }
+        if (subject_ids.length > 1) {
+          warnings.push(`Professor '${name}': múltiplas disciplinas informadas; usando apenas a primeira para gerar vínculos por horário.`);
+        }
+
+        if (subjectId && classIds.length && roomIds.length) {
+          // Usa apenas a primeira turma/sala por padrão para evitar colisões impossíveis (mesmo professor em duas turmas no mesmo horário)
+          const cid = classIds[0];
+          const rid = roomIds[0];
+
+          for (const [k, v] of Object.entries(schedule)) {
+            const key = asString(k).trim().toLowerCase();
+            const wd = weekdayMap[key] ?? weekdayMap[key.slice(0, 3)] ?? null;
+            if (!wd) continue;
+            const periods: number[] = Array.isArray(v)
+              ? v.map((n: any) => Number(n)).filter((n: any) => Number.isFinite(n) && n >= 1 && n <= 30)
+              : [];
+            for (const p of periods) {
+              teaching_rules.push({
+                subject_id: subjectId,
+                room_id: rid,
+                class_id: cid,
+                shift: teacherShift,
+                period_index: p,
+                weekdays: [wd],
+              });
+            }
+          }
+        }
+        if (subjectId && (!classIds.length || !roomIds.length)) {
+          if (!classIds.length) warnings.push(`Professor '${name}': nenhuma turma encontrada para vincular no horário (cadastre turmas antes ou informe a turma no professor).`);
+          if (!roomIds.length) warnings.push(`Professor '${name}': nenhuma sala encontrada para vincular no horário (cadastre salas antes ou informe a sala no professor).`);
+        }
+      }
+
+      // Deriva os campos legados que o restante do sistema e as telas usam.
+      // Isso faz com que a tela de Professores mostre Disciplinas/Turmas/Salas/Turnos corretamente.
+      const derived = deriveLegacyFieldsFromTeachingRules((teaching_rules as any[]) ?? []);
 
       const payload: any = {
         school_id: schoolId,
@@ -345,8 +470,17 @@ async function applySetupPlan(opts: {
         short_name,
         email,
         allow_interjornada_lt_11,
-        subject_ids,
         teaching_rules,
+
+        // Campos derivados (compatibilidade/legado)
+        shifts: derived.shifts,
+        availability: derived.availability,
+        available_weekdays: derived.available_weekdays,
+        subject_id: derived.subject_id,
+        default_room_id: derived.default_room_id,
+        subject_ids: derived.subject_ids ?? [],
+        room_ids: derived.room_ids ?? [],
+        class_ids: derived.class_ids ?? [],
       };
 
       const { error } = await admin.from("teachers").insert(payload);

@@ -21,13 +21,24 @@ export default async function Page({
   const { supabase, profile } = await requireStaff();
   const sp = (await searchParams) ?? {};
 
+  const qRaw = typeof sp.q === "string" ? sp.q : "";
+  const q = qRaw.trim().replace(/,/g, " ");
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+  const like = `%${q}%`;
+
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
-  const { data: rows, error: loadError } = await supabase
+  let subjectsQuery = supabase
     .from("subjects")
     .select("id, name, short_name, display_order")
-    .eq("school_id", profile.school_id)
+    .eq("school_id", profile.school_id);
+
+  if (q) {
+    subjectsQuery = subjectsQuery.or(isUuid ? `id.eq.${q},name.ilike.${like},short_name.ilike.${like}` : `name.ilike.${like},short_name.ilike.${like}`);
+  }
+
+  const { data: rows, error: loadError } = await subjectsQuery
     .order("display_order", { ascending: true, nullsFirst: false })
     .order("name", { ascending: true });
 
@@ -87,6 +98,17 @@ export default async function Page({
     redirect("/subjects?msg=" + encodeMsg("Disciplina removida."));
   }
 
+  async function deleteAllAction() {
+    "use server";
+    const { supabase, profile } = await requireStaff();
+
+    const { error } = await supabase.from("subjects").delete().eq("school_id", profile.school_id);
+    if (error) redirect("/subjects?error=" + encodeMsg(error.message));
+
+    revalidatePath("/subjects");
+    redirect("/subjects?msg=" + encodeMsg("Todas as disciplinas foram removidas."));
+  }
+
   const rowsTyped = (rows as Row[] | null) ?? [];
 
   return (
@@ -114,6 +136,35 @@ export default async function Page({
         </div>
 
         <div className="table-wrap">
+          <div className="flex flex-col gap-3 border-b border-zinc-100 p-4 dark:border-zinc-900 sm:flex-row sm:items-center sm:justify-between">
+            <form action="/subjects" method="GET" className="flex w-full max-w-md gap-2">
+              <input
+                name="q"
+                type="text"
+                placeholder="Pesquisar por nome (ou ID)"
+                defaultValue={q}
+                className="input w-full"
+              />
+              <button type="submit" className="btn btn-secondary">
+                Pesquisar
+              </button>
+              {q ? (
+                <a href="/subjects" className="btn btn-ghost">
+                  Limpar
+                </a>
+              ) : null}
+            </form>
+
+            <form action={deleteAllAction}>
+              <ConfirmButton
+                confirmText="Tem certeza que deseja excluir TODOS os registros?"
+                type="submit"
+                className="btn btn-danger"
+              >
+                Excluir todos
+              </ConfirmButton>
+            </form>
+          </div>
           <div className="overflow-x-auto">
             <table className="table">
               <thead>
