@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
+import { DashboardSetupChat } from "@/components/DashboardSetupChat";
 import { getNavSections } from "@/components/nav";
 import { requireStaff } from "@/lib/require-staff";
 import { decodeMsg } from "@/lib/flash";
@@ -201,6 +202,8 @@ export default async function DashboardPage({
             </div>
           </div>
         )}
+      {active && isDirector ? <DashboardSetupChat /> : null}
+
       </div>
     </Shell>
   );

@@ -441,6 +441,16 @@ export default async function Page({
                                 />
                               </label>
 
+                              <label className="flex items-center gap-2">
+                                <input
+                                  name="allow_interjornada_lt_11"
+                                  type="checkbox"
+                                  defaultChecked={Boolean(row.allow_interjornada_lt_11)}
+                                  className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-950"
+                                />
+                                <span className="text-sm font-medium">Permitir Interjornada inferior a 11 horas</span>
+                              </label>
+
                               <button
                                 type="submit"
                                 className="w-fit rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
