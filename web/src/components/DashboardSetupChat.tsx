@@ -14,9 +14,9 @@ type SetupPlan = {
 };
 
 const SUGGESTIONS = [
-  "Quero parametrizar do zero: disciplinas, salas, turmas, horários, professores e montar a grade da manhã.",
-  "Cadastre as disciplinas Matemática e Português; salas 1 e 2; turmas A e B (manhã); crie 5 períodos de 50min; e proponha os professores e regras.",
-  "Analise o que já existe e me diga o que falta para montar a grade do turno MANHÃ.",
+  "Quero cadastrar do zero: disciplinas (Matemática, Português), salas (Sala 1, Sala 2), turmas (7ºA manhã, 7ºB manhã), horários (6 períodos de 50min, seg-sex, início 07:00) e as habilitações por horário dos professores. Exemplo: João (MANHÃ) — Seg 1: Matemática 7ºA Sala 1; Seg 2: Matemática 7ºB Sala 1; Qua 1: Matemática 7ºA Sala 1. Maria (MANHÃ) — Ter 1: Português 7ºA Sala 2; Sex 2: Português 7ºB Sala 2.",
+  "Cadastre disciplinas (Matemática, Português) e salas (Sala 1, Sala 2). Depois crie habilitações por horário: João — Seg 1 Matemática 7ºA Sala 1 (manhã); Maria — Seg 2 Português 7ºB Sala 2 (manhã).",
+  "Analise o que já existe e me diga o que falta (disciplinas, salas, turmas, horários e habilitações por horário dos professores: disciplina+sala+turma+turno+período+dia) para eu montar a grade do turno MANHÃ.",
 ];
 
 function isSupported() {
@@ -30,7 +30,7 @@ export function DashboardSetupChat() {
     {
       role: "assistant",
       content:
-        "Sou o assistente de parametrização. Me diga o que você quer configurar (disciplinas, salas, turmas, horários, professores) e se quer montar a grade. Vou pedir as informações que faltarem e, quando estiver tudo claro, aplico no sistema.",
+        "Sou o assistente de parametrização. Me diga o que você quer cadastrar (disciplinas, salas, turmas, horários e professores). Para conseguir montar a grade automaticamente, eu preciso das HABILITAÇÕES POR HORÁRIO dos professores: disciplina + sala + turma + turno + período + dia da semana. Vou pedir o que faltar e, quando estiver tudo claro, deixo um plano pronto para você aplicar no sistema.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -358,38 +358,11 @@ return (
         <div>
           <h2 className="text-lg font-semibold">IA para parametrização do sistema</h2>
           <p className="mt-1 muted max-w-prose">
-            Peça para cadastrar disciplinas, salas, turmas, horários, professores e montar a grade. O assistente vai
-            coletar os dados que faltarem e aplicar no sistema.
+            Peça para cadastrar disciplinas, salas, turmas, horários e professores.
+            Para montar a grade automaticamente, informe as <b>habilitações por horário</b> de cada professor
+            (disciplina + sala + turma + turno + período + dia).
+            O assistente vai coletar os dados que faltarem e preparar um plano para aplicar no sistema.
           </p>
-
-{pendingPlan ? (
-  <div className="mt-3 w-full rounded-xl border border-dashed p-3">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <div className="text-sm font-semibold">Plano pronto para aplicar</div>
-        <div className="muted text-sm">
-          A IA gerou um plano estruturado. Você pode aplicar os cadastros no banco e, se solicitado, montar a grade.
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {pendingPlanText ? (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => {
-              navigator.clipboard?.writeText(pendingPlanText).catch(() => {});
-            }}
-          >
-            Copiar JSON
-          </button>
-        ) : null}
-        <button type="button" className="btn btn-primary" onClick={() => applyPlan(pendingPlan!)}>
-          Aplicar no sistema
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}
         </div>
 
         <button
@@ -490,8 +463,38 @@ return (
           )}
         </div>
 
+        {pendingPlan ? (
+          <div className="mt-3 rounded-xl border border-dashed p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">Plano pronto para aplicar</div>
+                <div className="muted text-sm">
+                  Ao aplicar, os cadastros serão efetivados nas telas correspondentes (Disciplinas, Salas, Turmas,
+                  Horários e Professores). Para gerar a grade, use o menu <b>Montar Grade</b>.
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {pendingPlanText ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(pendingPlanText).catch(() => {});
+                    }}
+                  >
+                    Copiar JSON
+                  </button>
+                ) : null}
+                <button type="button" className="btn btn-primary" onClick={() => applyPlan(pendingPlan!)}>
+                  Aplicar no sistema
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-2 text-xs text-zinc-500">
-          Dica: descreva turno, quantidade de períodos, duração, dias da semana, e a carga/Distribuição por professor.
+          Dica: descreva turno, dias da semana, quantidade de períodos e duração. Para professores, passe as habilitações por horário: dia + período + turma + disciplina + sala.
         </div>
       </div>
     </div>

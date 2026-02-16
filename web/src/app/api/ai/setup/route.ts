@@ -25,8 +25,10 @@ function extractFirstJsonCodeBlock(text: string): any | null {
 
 type SetupPlan = {
   action: "apply";
-  subjects?: { name: string; short_name?: string | null }[];
-  rooms?: { name: string; short_name?: string | null }[];
+  // Observação: a IA (ou o usuário) pode enviar strings ao invés de objetos.
+  // Ex.: subjects: ["Matemática"] / rooms: ["Sala 1"]. Normalizamos na aplicação.
+  subjects?: ({ name: string; short_name?: string | null } | string)[];
+  rooms?: ({ name: string; short_name?: string | null } | string)[];
   classes?: { name: string; shift?: string | null }[];
   timeSlots?: any;
   teachers?: any[];
@@ -126,13 +128,26 @@ async function applySetupPlan(opts: {
   const execLog: string[] = [];
   const warnings: string[] = [];
 
+  function getNameLike(v: any): string {
+    if (v == null) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "object") return asString((v as any).name ?? (v as any).nome ?? (v as any).title).trim();
+    return asString(v);
+  }
+
   // 1) Subjects
   const subjectNameToId = new Map<string, string>();
-  if (Array.isArray(plan.subjects) && plan.subjects.length) {
-    for (const s of plan.subjects) {
-      const name = asString((s as any).name).trim();
+  const subjectsInput: any[] =
+    (Array.isArray((plan as any).subjects) && (plan as any).subjects) ||
+    (Array.isArray((plan as any).disciplinas) && (plan as any).disciplinas) ||
+    (Array.isArray((plan as any).disciplines) && (plan as any).disciplines) ||
+    [];
+
+  if (Array.isArray(subjectsInput) && subjectsInput.length) {
+    for (const s of subjectsInput) {
+      const name = getNameLike(s).trim();
       if (!name) continue;
-      const short_name = asString((s as any).short_name).trim() || null;
+      const short_name = typeof s === "object" ? (asString((s as any).short_name).trim() || null) : null;
       const { data, error } = await admin
         .from("subjects")
         .insert({ school_id: schoolId, name, short_name })
@@ -174,9 +189,15 @@ async function applySetupPlan(opts: {
   // Quando o fluxo é executado em etapas (salas cadastradas em uma etapa anterior),
   // o plano atual pode não trazer `rooms`. Guardamos uma opção padrão do banco.
   let firstRoomId: string | null = null;
-  if (Array.isArray(plan.rooms) && plan.rooms.length) {
-    for (const r of plan.rooms) {
-      const name = asString((r as any).name).trim();
+
+  const roomsInput: any[] =
+    (Array.isArray((plan as any).rooms) && (plan as any).rooms) ||
+    (Array.isArray((plan as any).salas) && (plan as any).salas) ||
+    [];
+
+  if (Array.isArray(roomsInput) && roomsInput.length) {
+    for (const r of roomsInput) {
+      const name = getNameLike(r).trim();
       if (!name) continue;
       const { data, error } = await admin
         .from("rooms")
@@ -216,6 +237,7 @@ async function applySetupPlan(opts: {
 
   // 3) Classes
   const classNameToId = new Map<string, string>();
+  const classNameToShift = new Map<string, string>();
   let firstClassId: string | null = null;
   if (Array.isArray(plan.classes) && plan.classes.length) {
     for (const c of plan.classes) {
@@ -242,21 +264,25 @@ async function applySetupPlan(opts: {
         throw new Error(`Erro ao criar turma '${name}': ${error.message}`);
       }
       if (data?.id) classNameToId.set(normalizeKey(name), data.id);
+      classNameToShift.set(normalizeKey(name), shift);
       execLog.push(`Turma criada: ${name} (${shift})`);
     }
   }
 
   const { data: classesExisting } = await admin
     .from("classes")
-    .select("id,name")
+    .select("id,name,shift")
     .eq("school_id", schoolId);
   for (const c of (classesExisting as any[]) ?? []) {
     const n = normalizeKey(c?.name);
     if (n && c?.id) classNameToId.set(n, c.id);
+    if (n && c?.shift) classNameToShift.set(n, normalizeShift(c.shift));
     if (!firstClassId && c?.id) firstClassId = c.id;
   }
 
   // 4) Time slots
+  // Guardamos uma contagem padrão de períodos por turno para ajudar a criar disponibilidade de professores.
+  const defaultPeriodCountByShift = new Map<string, number>();
   if (plan.timeSlots) {
     const ts = plan.timeSlots as any;
     const entries: any[] = Array.isArray(ts?.entries) ? ts.entries : [];
@@ -268,6 +294,12 @@ async function applySetupPlan(opts: {
         const starts_at = asString(e?.starts_at).trim();
         const ends_at = asString(e?.ends_at).trim();
         const eShift = normalizeShift(e?.shift ?? shift);
+
+        if (Number.isFinite(period_index) && period_index > 0) {
+          const prev = defaultPeriodCountByShift.get(eShift) ?? 0;
+          if (period_index > prev) defaultPeriodCountByShift.set(eShift, period_index);
+        }
+
         if (!weekday || !period_index || !starts_at || !ends_at) continue;
         const { error } = await admin.from("time_slots").insert({
           school_id: schoolId,
@@ -286,6 +318,9 @@ async function applySetupPlan(opts: {
       const periodMinutes = Number(ts?.periodMinutes || ts?.durationMinutes || 0) || 50;
       const startTime = asString(ts?.startTime || "07:00").trim();
       if (periods > 0 && startTime) {
+        const prev = defaultPeriodCountByShift.get(shift) ?? 0;
+        if (periods > prev) defaultPeriodCountByShift.set(shift, periods);
+
         const [sh, sm] = startTime.split(":").map((x) => Number(x));
         for (const wd of weekdays) {
           let curMin = sh * 60 + sm;
@@ -313,18 +348,206 @@ async function applySetupPlan(opts: {
 
   // 5) Teachers
   if (Array.isArray(plan.teachers) && plan.teachers.length) {
+    const weekdayMap: Record<string, number> = {
+      "seg": 1,
+      "segunda": 1,
+      "segunda-feira": 1,
+      "ter": 2,
+      "terca": 2,
+      "terça": 2,
+      "terça-feira": 2,
+      "qua": 3,
+      "quarta": 3,
+      "quarta-feira": 3,
+      "qui": 4,
+      "quinta": 4,
+      "quinta-feira": 4,
+      "sex": 5,
+      "sexta": 5,
+      "sexta-feira": 5,
+      "sab": 6,
+      "sábado": 6,
+      "sabado": 6,
+      "dom": 7,
+      "domingo": 7,
+    };
+
+    function uniq<T>(arr: T[]) {
+      return Array.from(new Set(arr));
+    }
+
+    function parseWeekdaysAny(raw: any): number[] | null {
+      if (raw == null) return null;
+
+      const collect: number[] = [];
+      const push = (v: any) => {
+        if (v == null) return;
+        if (typeof v === "number" || (typeof v === "string" && v.trim().match(/^\d+$/))) {
+          const n = Number(v);
+          if (Number.isFinite(n) && n >= 1 && n <= 7) collect.push(n);
+          return;
+        }
+        const key = asString(v).trim().toLowerCase();
+        if (!key) return;
+
+        // ranges like "seg-sex" / "segunda a sexta"
+        if (key.includes("-") || key.includes(" a ")) {
+          const parts = key
+            .replace(/\s+/g, " ")
+            .replace("até", "a")
+            .split(/-| a /)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if (parts.length === 2) {
+            const a = weekdayMap[parts[0]] ?? weekdayMap[parts[0].slice(0, 3)];
+            const b = weekdayMap[parts[1]] ?? weekdayMap[parts[1].slice(0, 3)];
+            if (a && b) {
+              const start = Math.min(a, b);
+              const end = Math.max(a, b);
+              for (let i = start; i <= end; i++) collect.push(i);
+              return;
+            }
+          }
+        }
+
+        // comma/semicolon separated
+        const tokens = key.split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+        if (tokens.length > 1) {
+          for (const t of tokens) push(t);
+          return;
+        }
+
+        const wd = weekdayMap[key] ?? weekdayMap[key.slice(0, 3)] ?? null;
+        if (wd) collect.push(wd);
+      };
+
+      if (Array.isArray(raw)) {
+        for (const v of raw) push(v);
+      } else {
+        push(raw);
+      }
+
+      const out = uniq(collect).filter((n) => n >= 1 && n <= 7).sort((a, b) => a - b);
+      return out.length ? out : null;
+    }
+
+    function parsePeriodIndexesAny(raw: any): number[] {
+      if (raw == null) return [];
+      const out: number[] = [];
+      const push = (v: any) => {
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 1 && n <= 30) out.push(n);
+      };
+
+      // array => list
+      if (Array.isArray(raw)) {
+        for (const v of raw) push(v);
+        return uniq(out).sort((a, b) => a - b);
+      }
+
+      // object range
+      if (raw && typeof raw === "object") {
+        const start = Number((raw as any).start ?? (raw as any).from ?? (raw as any).ini ?? (raw as any).begin);
+        const end = Number((raw as any).end ?? (raw as any).to ?? (raw as any).fim ?? (raw as any).finish);
+        if (Number.isFinite(start) && Number.isFinite(end) && start >= 1 && end >= start) {
+          for (let i = start; i <= end && i <= 30; i++) out.push(i);
+          return uniq(out).sort((a, b) => a - b);
+        }
+      }
+
+      // string range "1-3" / "1..6" / "1 a 6"
+      if (typeof raw === "string") {
+        const s = raw.trim().toLowerCase();
+        const m = s.match(/(\d+)\s*(?:-|\.\.|a|até)\s*(\d+)/);
+        if (m) {
+          const a = Number(m[1]);
+          const b = Number(m[2]);
+          if (Number.isFinite(a) && Number.isFinite(b) && a >= 1 && b >= a) {
+            for (let i = a; i <= b && i <= 30; i++) out.push(i);
+            return uniq(out).sort((a, b) => a - b);
+          }
+        }
+        // comma separated
+        if (s.includes(",") || s.includes(";")) {
+          s.split(/[;,]/)
+            .map((x) => x.trim())
+            .filter(Boolean)
+            .forEach((x) => push(x));
+          return uniq(out).sort((a, b) => a - b);
+        }
+      }
+
+      push(raw);
+      return uniq(out).sort((a, b) => a - b);
+    }
+
+    function parseWeekdays(raw: any): number[] {
+      const arr: number[] = Array.isArray(raw)
+        ? raw
+            .map((n: any) => Number(n))
+            .filter((n: number) => Number.isFinite(n) && n >= 1 && n <= 7)
+        : [];
+      const out = arr.length ? uniq(arr).sort((a, b) => a - b) : [1, 2, 3, 4, 5];
+      return out;
+    }
+
+    function parsePeriods(raw: any, fallbackCount: number): number[] {
+      if (Array.isArray(raw)) {
+        const arr = raw.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n) && n >= 1 && n <= 30);
+        if (arr.length) return uniq(arr).sort((a, b) => a - b);
+      }
+      const start = Number(raw?.start ?? raw?.from ?? raw?.ini);
+      const end = Number(raw?.end ?? raw?.to ?? raw?.fim);
+      if (Number.isFinite(start) && Number.isFinite(end) && start >= 1 && end >= start && end <= 30) {
+        const out: number[] = [];
+        for (let i = start; i <= end; i++) out.push(i);
+        return out;
+      }
+      const count = Number(raw) || fallbackCount;
+      const n = Number.isFinite(count) && count > 0 ? Math.min(30, count) : fallbackCount;
+      const out: number[] = [];
+      for (let i = 1; i <= n; i++) out.push(i);
+      return out;
+    }
+
+    function normalizeAvailability(raw: any): any | null {
+      if (!raw || typeof raw !== "object") return null;
+      const out: any = {};
+      for (const [k, v] of Object.entries(raw)) {
+        const shift = normalizeShift(k);
+        if (!shift) continue;
+        if (!v || typeof v !== "object") continue;
+        out[shift] ??= {};
+        for (const [dayKey, periodsRaw] of Object.entries(v as any)) {
+          const d = Number(dayKey);
+          if (!Number.isFinite(d) || d < 1 || d > 7) continue;
+          const periods = Array.isArray(periodsRaw)
+            ? periodsRaw.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n) && n >= 1 && n <= 30)
+            : [];
+          if (!periods.length) continue;
+          out[shift][String(d)] = uniq(periods).sort((a, b) => a - b);
+        }
+      }
+      return Object.keys(out).length ? out : null;
+    }
+
+    const fallbackShiftFromPlan = normalizeShift(
+      (plan.buildSchedule as any)?.shift || (plan.classes?.[0] as any)?.shift || "MANHA",
+    );
+
     for (const t of plan.teachers) {
       const name = asString((t as any).name).trim();
       if (!name) continue;
+
       const short_name = asString((t as any).short_name).trim() || null;
       const email = asString((t as any).email).trim() || null;
       const allow_interjornada_lt_11 = Boolean((t as any).allow_interjornada_lt_11);
 
+      // --- Disciplinas
       const subject_ids: string[] = [];
-      const subjects = (t as any).subjects ?? (t as any).subject_ids ?? [];
+      const subjects = (t as any).subjects ?? (t as any).disciplinas ?? (t as any).subject_ids ?? [];
       if (Array.isArray(subjects)) {
         for (const s of subjects) {
-          // Pode vir como string ("Português") ou objeto ({ name: "Português" })
           const val = asString(typeof s === "object" ? (s as any)?.name : s).trim();
           if (!val) continue;
           if (val.includes("-")) subject_ids.push(val);
@@ -335,11 +558,112 @@ async function applySetupPlan(opts: {
         }
       }
 
+      // --- Turmas
+      const classNamesRaw = (t as any).classes ?? (t as any).turmas ?? (t as any).class ?? (t as any).turma ?? (t as any).class_ids;
+      const classNames: string[] = Array.isArray(classNamesRaw)
+        ? classNamesRaw.map((x: any) => asString(typeof x === "object" ? (x as any)?.name : x).trim()).filter(Boolean)
+        : [asString(typeof classNamesRaw === "object" ? (classNamesRaw as any)?.name : classNamesRaw).trim()].filter(Boolean);
+      const class_ids: string[] = [];
+      for (const cn of classNames) {
+        if (!cn) continue;
+        if (cn.includes("-")) class_ids.push(cn);
+        else {
+          const resolved = classNameToId.get(normalizeKey(cn));
+          if (resolved) class_ids.push(resolved);
+        }
+      }
+
+      // --- Salas
+      const roomNamesRaw = (t as any).rooms ?? (t as any).salas ?? (t as any).room ?? (t as any).sala ?? (t as any).room_ids;
+      const roomNames: string[] = Array.isArray(roomNamesRaw)
+        ? roomNamesRaw.map((x: any) => asString(typeof x === "object" ? (x as any)?.name : x).trim()).filter(Boolean)
+        : [asString(typeof roomNamesRaw === "object" ? (roomNamesRaw as any)?.name : roomNamesRaw).trim()].filter(Boolean);
+      const room_ids: string[] = [];
+      for (const rn of roomNames) {
+        if (!rn) continue;
+        if (rn.includes("-")) room_ids.push(rn);
+        else {
+          const resolved = roomNameToId.get(normalizeKey(rn));
+          if (resolved) room_ids.push(resolved);
+        }
+      }
+
+      // --- Turnos
+      const shiftsRaw = (t as any).shifts ?? (t as any).turnos ?? (t as any).shift ?? (t as any).turno;
+      const shifts: string[] = Array.isArray(shiftsRaw)
+        ? shiftsRaw.map((s: any) => normalizeShift(s)).filter(Boolean)
+        : [normalizeShift(shiftsRaw)].filter(Boolean);
+
+      if (shifts.length === 0) {
+        const firstClassName = classNames[0] ? normalizeKey(classNames[0]) : "";
+        const inferred = firstClassName ? classNameToShift.get(firstClassName) : null;
+        shifts.push(inferred || fallbackShiftFromPlan || "MANHA");
+      }
+
+      // --- Disponibilidade
+      // - Se vier em availability, respeitamos.
+      // - Se vier em schedule (ex.: {"segunda":[1,2,3]}), convertemos.
+      // - Senão, criamos automaticamente seg-sex e todos os períodos do turno.
+      let available_weekdays = parseWeekdays((t as any).weekdays ?? (t as any).dias_semana);
+      const schedule = (t as any).schedule;
+      const periodsRaw =
+        (t as any).periods ?? (t as any).periodos ?? (t as any).period_range ?? (t as any).periodRange ?? (t as any).periodCount;
+
+      const availabilityFromRaw = normalizeAvailability((t as any).availability);
+      let availability: any | null = availabilityFromRaw;
+
+      if (!availability && schedule && typeof schedule === "object" && !Array.isArray(schedule)) {
+        // Usa apenas o primeiro turno como base.
+        const baseShift = shifts[0] ? normalizeShift(shifts[0]) : fallbackShiftFromPlan;
+        availability = { [baseShift]: {} };
+        const daySet = new Set<number>();
+        for (const [k, v] of Object.entries(schedule)) {
+          const key = asString(k).trim().toLowerCase();
+          const wd = weekdayMap[key] ?? weekdayMap[key.slice(0, 3)] ?? null;
+          if (!wd) continue;
+          const p = Array.isArray(v)
+            ? v.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n) && n >= 1 && n <= 30)
+            : [];
+          if (!p.length) continue;
+          availability[baseShift][String(wd)] = uniq(p).sort((a, b) => a - b);
+          daySet.add(wd);
+        }
+        const days = Array.from(daySet).sort((a, b) => a - b);
+        if (days.length) available_weekdays = days;
+      }
+
+      if (!availability) {
+        const baseShift = shifts[0] ? normalizeShift(shifts[0]) : fallbackShiftFromPlan;
+        const fallbackPeriods = defaultPeriodCountByShift.get(baseShift) ?? defaultPeriodCountByShift.get(fallbackShiftFromPlan) ?? 6;
+        const periods = parsePeriods(periodsRaw, fallbackPeriods);
+
+        availability = {};
+        for (const s of shifts) {
+          const sh = normalizeShift(s);
+          if (!sh) continue;
+          availability[sh] ??= {};
+          for (const d of available_weekdays) {
+            availability[sh][String(d)] = periods;
+          }
+        }
+      }
+
+      // --- Teaching rules (opcional)
       let teaching_rules: any = (t as any).teaching_rules;
       if (!Array.isArray(teaching_rules) && typeof teaching_rules === "string") {
-        try { teaching_rules = JSON.parse(teaching_rules); } catch { teaching_rules = []; }
+        try {
+          teaching_rules = JSON.parse(teaching_rules);
+        } catch {
+          teaching_rules = [];
+        }
       }
       if (!Array.isArray(teaching_rules)) teaching_rules = [];
+
+      // --- Habilitações por horário (combinação Disciplina + Sala + Turno + Período + Turma)
+      // Aceita formatos:
+      // - rulesByName: [{ subject, room, class, shift, period_index, weekdays }]
+      // - habilitacoes/habilitações/horarios: [{ disciplina, sala, turma, turno, periodos, dias }]
+      // O backend resolve nomes -> IDs.
 
       const rulesByName: any[] = Array.isArray((t as any).rulesByName) ? (t as any).rulesByName : [];
       for (const r of rulesByName) {
@@ -357,131 +681,116 @@ async function applySetupPlan(opts: {
         teaching_rules.push({ subject_id: sid, room_id: rid, class_id: cid, shift, period_index, weekdays });
       }
 
-      // Suporte a um formato mais simples vindo do chat:
-      // teachers: [{ name, subjects:["Matemática"], schedule:{"segunda":[1,2],"terça":[3]} , shift:"MANHÃ", class:"Turma A", room:"Sala 1" }]
-      // Se class/room não vierem, usamos defaults (e avisamos) para garantir que as telas/grade consigam trabalhar.
-      const schedule = (t as any).schedule;
-      if (schedule && typeof schedule === "object" && !Array.isArray(schedule)) {
-        const weekdayMap: Record<string, number> = {
-          "seg": 1,
-          "segunda": 1,
-          "segunda-feira": 1,
-          "ter": 2,
-          "terca": 2,
-          "terça": 2,
-          "terça-feira": 2,
-          "qua": 3,
-          "quarta": 3,
-          "quarta-feira": 3,
-          "qui": 4,
-          "quinta": 4,
-          "quinta-feira": 4,
-          "sex": 5,
-          "sexta": 5,
-          "sexta-feira": 5,
-        };
+      const habilRaw =
+        (t as any).habilitacoes ??
+        (t as any)["habilitações"] ??
+        (t as any).habilitacao ??
+        (t as any).habilitations ??
+        (t as any).allocations ??
+        (t as any).horarios ??
+        (t as any)["horário"] ??
+        (t as any).horarios_por_professor ??
+        null;
 
-        const teacherShift = normalizeShift((t as any).shift || (plan.buildSchedule as any)?.shift || (plan.classes?.[0] as any)?.shift || "MANHA");
+      const habilArr: any[] = Array.isArray(habilRaw) ? habilRaw : [];
+      for (const h of habilArr) {
+        if (!h || typeof h !== "object") continue;
+        const subjectName = asString((h as any).subject ?? (h as any).disciplina ?? (h as any).discipline).trim();
+        const roomName = asString((h as any).room ?? (h as any).sala).trim();
+        const className = asString((h as any).class ?? (h as any).turma).trim();
 
-        // Resolve turma(s)
-        const classNamesRaw = (t as any).classes ?? (t as any).turmas ?? (t as any).class ?? (t as any).turma;
-        let classIds: string[] = [];
-        const classNames: string[] = Array.isArray(classNamesRaw)
-          ? classNamesRaw.map((x: any) => asString(x).trim()).filter(Boolean)
-          : [asString(classNamesRaw).trim()].filter(Boolean);
-        for (const cn of classNames) {
-          const cid = classNameToId.get(normalizeKey(cn));
-          if (cid) classIds.push(cid);
-        }
-        if (classIds.length === 0) {
-          // Fluxo em etapas: o plano atual pode não conter `classes`.
-          // Usa a primeira turma já cadastrada no banco para garantir que teaching_rules seja preenchido.
-          if (firstClassId) {
-            classIds = [firstClassId];
-            warnings.push(`Professor '${name}': turma não informada; usando a primeira turma cadastrada como padrão.`);
-          }
-        }
+        const sid = subjectNameToId.get(normalizeKey(subjectName));
+        const rid = roomNameToId.get(normalizeKey(roomName));
+        const cid = classNameToId.get(normalizeKey(className));
+        if (!sid || !rid || !cid) continue;
 
-        // Resolve sala(s)
-        const roomNamesRaw = (t as any).rooms ?? (t as any).salas ?? (t as any).room ?? (t as any).sala;
-        let roomIds: string[] = [];
-        const roomNames: string[] = Array.isArray(roomNamesRaw)
-          ? roomNamesRaw.map((x: any) => asString(x).trim()).filter(Boolean)
-          : [asString(roomNamesRaw).trim()].filter(Boolean);
-        for (const rn of roomNames) {
-          const rid = roomNameToId.get(normalizeKey(rn));
-          if (rid) roomIds.push(rid);
-        }
-        if (roomIds.length === 0) {
-          // Fluxo em etapas: o plano atual pode não conter `rooms`.
-          // Usa a primeira sala já cadastrada no banco para garantir que teaching_rules seja preenchido.
-          if (firstRoomId) {
-            roomIds = [firstRoomId];
-            warnings.push(`Professor '${name}': sala não informada; usando a primeira sala cadastrada como padrão.`);
-          }
-        }
+        const inferredShift = classNameToShift.get(normalizeKey(className)) ?? null;
+        const shift = normalizeShift(
+          (h as any).shift ?? (h as any).turno ?? inferredShift ?? shifts?.[0] ?? fallbackShiftFromPlan,
+        );
 
-        // Resolve disciplina (se várias, usa a primeira e avisa)
-        const subjectId = subject_ids[0] || null;
-        if (!subjectId) {
-          warnings.push(`Professor '${name}': disciplinas ausentes; não foi possível gerar vínculos por horário.`);
-        }
-        if (subject_ids.length > 1) {
-          warnings.push(`Professor '${name}': múltiplas disciplinas informadas; usando apenas a primeira para gerar vínculos por horário.`);
-        }
+        const weekdays =
+          parseWeekdaysAny((h as any).weekdays ?? (h as any).dias ?? (h as any).dia ?? (h as any).weekday) ?? null;
 
-        if (subjectId && classIds.length && roomIds.length) {
-          // Usa apenas a primeira turma/sala por padrão para evitar colisões impossíveis (mesmo professor em duas turmas no mesmo horário)
-          const cid = classIds[0];
-          const rid = roomIds[0];
+        const periods = parsePeriodIndexesAny(
+          (h as any).periods ??
+            (h as any).periodos ??
+            (h as any)["períodos"] ??
+            (h as any).periodo ??
+            (h as any)["período"] ??
+            (h as any).period_index ??
+            (h as any).periodIndex,
+        );
+        if (periods.length === 0) continue;
 
-          for (const [k, v] of Object.entries(schedule)) {
-            const key = asString(k).trim().toLowerCase();
-            const wd = weekdayMap[key] ?? weekdayMap[key.slice(0, 3)] ?? null;
-            if (!wd) continue;
-            const periods: number[] = Array.isArray(v)
-              ? v.map((n: any) => Number(n)).filter((n: any) => Number.isFinite(n) && n >= 1 && n <= 30)
-              : [];
-            for (const p of periods) {
-              teaching_rules.push({
-                subject_id: subjectId,
-                room_id: rid,
-                class_id: cid,
-                shift: teacherShift,
-                period_index: p,
-                weekdays: [wd],
-              });
-            }
-          }
-        }
-        if (subjectId && (!classIds.length || !roomIds.length)) {
-          if (!classIds.length) warnings.push(`Professor '${name}': nenhuma turma encontrada para vincular no horário (cadastre turmas antes ou informe a turma no professor).`);
-          if (!roomIds.length) warnings.push(`Professor '${name}': nenhuma sala encontrada para vincular no horário (cadastre salas antes ou informe a sala no professor).`);
+        for (const p of periods) {
+          teaching_rules.push({ subject_id: sid, room_id: rid, class_id: cid, shift, period_index: p, weekdays });
         }
       }
 
-      // Deriva os campos legados que o restante do sistema e as telas usam.
-      // Isso faz com que a tela de Professores mostre Disciplinas/Turmas/Salas/Turnos corretamente.
-      const derived = deriveLegacyFieldsFromTeachingRules((teaching_rules as any[]) ?? []);
+      // Dedup de habilitações no professor
+      if (Array.isArray(teaching_rules) && teaching_rules.length) {
+        const seen = new Set<string>();
+        const cleaned: any[] = [];
+        for (const r of teaching_rules) {
+          if (!r || typeof r !== "object") continue;
+          const sid = asString((r as any).subject_id).trim();
+          const rid = asString((r as any).room_id).trim();
+          const cid = asString((r as any).class_id).trim();
+          const sh = normalizeShift((r as any).shift);
+          const p = Number((r as any).period_index);
+          if (!sid || !rid || !cid || !sh || !Number.isFinite(p) || p < 1) continue;
+          const w = (r as any).weekdays;
+          const wKey =
+            Array.isArray(w) && w.length
+              ? uniq(w.map((n: any) => Number(n)).filter(Boolean))
+                  .sort((a, b) => a - b)
+                  .join(",")
+              : "*";
+          const key = `${sid}|${rid}|${cid}|${sh}|${p}|${wKey}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          cleaned.push({
+            subject_id: sid,
+            room_id: rid,
+            class_id: cid,
+            shift: sh,
+            period_index: p,
+            weekdays:
+              Array.isArray(w) && w.length
+                ? uniq(w.map((n: any) => Number(n)).filter(Boolean)).sort((a, b) => a - b)
+                : null,
+          });
+        }
+        teaching_rules = cleaned;
+      }
 
+      const hasRules = Array.isArray(teaching_rules) && teaching_rules.length > 0;
+      const derived = hasRules ? deriveLegacyFieldsFromTeachingRules((teaching_rules as any[]) ?? []) : null;
+
+      // Importante: quando NÃO há rules, precisamos garantir que os campos legados estejam preenchidos
+      // (para a tela de Professores e para o gerador de grade).
       const payload: any = {
         school_id: schoolId,
         name,
         short_name,
         email,
         allow_interjornada_lt_11,
-        teaching_rules,
+        teaching_rules: hasRules ? teaching_rules : [],
 
-        // Campos derivados (compatibilidade/legado)
-        shifts: derived.shifts,
-        availability: derived.availability,
-        available_weekdays: derived.available_weekdays,
-        subject_id: derived.subject_id,
-        default_room_id: derived.default_room_id,
-        subject_ids: derived.subject_ids ?? [],
-        room_ids: derived.room_ids ?? [],
-        class_ids: derived.class_ids ?? [],
+        shifts: derived?.shifts ?? shifts,
+        availability: derived ? derived.availability : availability,
+        available_weekdays: derived?.available_weekdays ?? available_weekdays,
+        subject_id: derived?.subject_id ?? (subject_ids.length === 1 ? subject_ids[0] : null),
+        default_room_id: derived?.default_room_id ?? (room_ids.length === 1 ? room_ids[0] : null),
+        subject_ids: derived?.subject_ids ?? uniq(subject_ids),
+        room_ids: derived?.room_ids ?? uniq(room_ids),
+        class_ids: derived?.class_ids ?? uniq(class_ids),
       };
+
+      if ((payload.subject_ids ?? []).length === 0) {
+        warnings.push(`Professor '${name}': disciplinas não informadas; a grade pode ficar incompleta.`);
+      }
 
       const { error } = await admin.from("teachers").insert(payload);
       if (error) warnings.push(`Professor '${name}': ${error.message}`);
@@ -502,27 +811,13 @@ async function applySetupPlan(opts: {
     // ignore
   }
 
-  // 6) Build schedule via existing endpoint (uses user cookie)
-  if (plan.buildSchedule && cookieHeader) {
+  // 6) Montagem de grade
+  // Não disparamos o gerador automaticamente aqui: isso evita erros no chat e mantém o fluxo oficial no menu.
+  if (plan.buildSchedule) {
     const shift = normalizeShift(plan.buildSchedule?.shift);
-    try {
-      const base = process.env.NEXT_PUBLIC_SITE_URL;
-      if (!base || !base.startsWith("http")) {
-        warnings.push("NEXT_PUBLIC_SITE_URL não configurado; não foi possível montar a grade automaticamente.");
-        return { execLog, warnings };
-      }
-      const url = `${base}/api/ai/build-global-schedule`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie: cookieHeader },
-        body: JSON.stringify({ shift }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) warnings.push(j?.error || "Falha ao montar a grade.");
-      else execLog.push(`Grade montada para o turno ${shift}.`);
-    } catch {
-      warnings.push("Não foi possível chamar o gerador de grade automaticamente.");
-    }
+    warnings.push(
+      `Cadastros concluídos. Para gerar a grade do turno ${shift || "MANHA"}, acesse no menu principal: Montar Grade.`
+    );
   }
 
   return { execLog, warnings };
@@ -620,11 +915,14 @@ Regras:
 
 Dados essenciais que você deve coletar (se não vierem no pedido):
 1) Turno (MANHÃ/TARDE/NOITE) e dias da semana usados.
-2) Quantidade de períodos e duração em minutos.
+2) Quantidade de períodos e duração em minutos (para criar os horários/time slots).
 3) Lista de disciplinas.
 4) Lista de salas.
 5) Lista de turmas (nome + turno).
-6) Professores: nome, disciplinas que leciona, e distribuição/carga por dia/período.
+6) Professores: nome e, obrigatoriamente, as HABILITAÇÕES POR HORÁRIO para conseguir montar a grade:
+   - Cada habilitação é uma combinação: disciplina + sala + turma + turno + período (+ dia da semana).
+   - Exemplo: "João dá Matemática na Sala 1 para a Turma 7ºA na 2ª feira no 1º período da manhã".
+   - Se o usuário não detalhar dias, pergunte. Se ele realmente quiser "seg-sex", então use weekdays [1,2,3,4,5].
 7) Restrições: indisponibilidades/HA, preferências, regras especiais.
 
 Formato de resposta:
@@ -635,13 +933,26 @@ IMPORTANTE: nesta versão, você NÃO deve fingir que executou ações.
 Quando o usuário confirmar, responda com um JSON em um bloco de código contendo:
 {
   "action": "apply",
-  "subjects": [...],
-  "rooms": [...],
-  "classes": [...],
+  "subjects": [{"name":"Matemática"}],
+  "rooms": [{"name":"Sala 1"}],
+  "classes": [{"name":"Turma A","shift":"MANHÃ"}],
   "timeSlots": {...},
-  "teachers": [...],
+  "teachers": [
+    {
+      "name": "Nome do Professor",
+      "email": "opcional",
+      "rulesByName": [
+        {"subject":"Matemática","class":"Turma A","room":"Sala 1","shift":"MANHÃ","weekdays":[1],"period_index":1},
+        {"subject":"Matemática","class":"Turma A","room":"Sala 1","shift":"MANHÃ","weekdays":[3],"period_index":2}
+      ]
+    }
+  ],
   "buildSchedule": {"shift":"MANHÃ"}
 }
+
+Notas importantes sobre o formato:
+- Para subjects/rooms/classes, use sempre OBJETOS com a chave "name" (não use apenas strings).
+- Para professores, prefira usar "rulesByName" (habilitações por horário). O backend resolve nomes -> IDs.
 
 O backend valida e aplica.
 `;
