@@ -175,7 +175,16 @@ export default async function DashboardPage({
         ) : (
           <div className="grid gap-4">
             <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-              <h2 className="text-lg font-semibold">Fluxo recomendado</h2>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="text-lg font-semibold">Fluxo recomendado</h2>
+                <Link
+                  href="/director/calendario"
+                  className="btn btn-secondary"
+                  title="Abrir calendário do diretor"
+                >
+                  Calendário
+                </Link>
+              </div>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
                 <li>
                   Cadastre <strong>Disciplinas</strong>
