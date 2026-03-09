@@ -37,6 +37,9 @@ type ApiResp = {
         teacher: string;
         room?: string | null;
         notes?: string | null;
+        isTeacherAbsent?: boolean;
+        replacementTeacherId?: string | null;
+        replacementTeacherName?: string | null;
       }
 	  >
 	>;
@@ -105,6 +108,8 @@ export function GradesByClassClient() {
           subjectId: string;
           roomId: string;
           notes: string;
+          isTeacherAbsent: boolean;
+          replacementTeacherId: string;
         };
       }
   >(null);
@@ -246,6 +251,8 @@ export function GradesByClassClient() {
                                   subjectId: String((cell as any)?.subjectId ?? ""),
                                   roomId: String((cell as any)?.roomId ?? ""),
                                   notes: String((cell as any)?.notes ?? ""),
+                                  isTeacherAbsent: Boolean((cell as any)?.isTeacherAbsent),
+                                  replacementTeacherId: String((cell as any)?.replacementTeacherId ?? ""),
                                 },
                               });
                             }}
@@ -254,6 +261,14 @@ export function GradesByClassClient() {
                               <div className="leading-tight">
                                 <div className="font-semibold">{cell.subject}</div>
                                 <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{cell.teacher}</div>
+                                {(cell as any)?.isTeacherAbsent ? (
+                                  <div className="mt-1 grid gap-0.5">
+                                    <div className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">Falta</div>
+                                    <div className="text-[10px] text-zinc-600 dark:text-zinc-300">
+                                      {(cell as any)?.replacementTeacherName ? `Subst.: ${(cell as any).replacementTeacherName}` : "Sem substituto"}
+                                    </div>
+                                  </div>
+                                ) : null}
                               </div>
                             ) : null}
                           </td>

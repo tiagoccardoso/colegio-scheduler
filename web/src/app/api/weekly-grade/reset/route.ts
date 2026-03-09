@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   // snapshot do que vai ser removido (para exibir no histórico)
   const { data: existing } = await supabase
     .from("schedules")
-    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
     .eq("school_id", profile.school_id)
     .in("time_slot_id", timeSlotIds);
 

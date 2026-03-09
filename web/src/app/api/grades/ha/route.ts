@@ -68,7 +68,7 @@ export async function GET(req: Request) {
     if (slotIds.length) {
       const { data, error } = await supabase
         .from("schedules")
-        .select("id,teacher_id,time_slot_id,activity_type,notes")
+        .select("id,teacher_id,time_slot_id,activity_type,notes,is_teacher_absent,replacement_teacher_id")
         .eq("school_id", schoolId)
         .in("time_slot_id", slotIds);
 
@@ -97,7 +97,16 @@ export async function GET(req: Request) {
 
     const byTeacher: Record<
       string,
-      { scheduleId: string; weekday: number; period_index: number | null; timeSlotId: string; notes: string | null }[]
+      {
+        scheduleId: string;
+        weekday: number;
+        period_index: number | null;
+        timeSlotId: string;
+        notes: string | null;
+        isTeacherAbsent?: boolean;
+        replacementTeacherId?: string | null;
+        replacementTeacherName?: string | null;
+      }[]
     > = {};
 
     for (const r of haRows) {
@@ -107,12 +116,17 @@ export async function GET(req: Request) {
       const ts = slotById.get(tsid);
       if (!ts) continue;
       byTeacher[tid] ||= [];
+      const replacementTeacherId = r?.replacement_teacher_id ? String(r.replacement_teacher_id) : null;
+      const replacementTeacher = replacementTeacherId ? teachers.find((t: any) => String(t.id) === replacementTeacherId) : null;
       byTeacher[tid].push({
         scheduleId: String(r.id),
         weekday: Number(ts.weekday),
         period_index: ts.period_index ?? null,
         timeSlotId: tsid,
         notes: r.notes ? String(r.notes) : null,
+        isTeacherAbsent: Boolean(r?.is_teacher_absent),
+        replacementTeacherId,
+        replacementTeacherName: replacementTeacher ? teacherLabel(replacementTeacher) : null,
       });
     }
 

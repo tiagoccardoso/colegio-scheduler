@@ -35,14 +35,17 @@ export async function GET(req: Request) {
 
     const schoolId = profile.school_id;
 
-    const { data: timeSlotsRaw } = await supabase
-      .from("time_slots")
-      .select("id,weekday,starts_at,ends_at,shift,period_index")
-      .eq("school_id", schoolId)
-      .eq("shift", shift)
-      .in("weekday", [1, 2, 3, 4, 5])
-      .order("weekday", { ascending: true })
-      .order("period_index", { ascending: true });
+    const [{ data: timeSlotsRaw }, { data: teachersRaw }] = await Promise.all([
+      supabase
+        .from("time_slots")
+        .select("id,weekday,starts_at,ends_at,shift,period_index")
+        .eq("school_id", schoolId)
+        .eq("shift", shift)
+        .in("weekday", [1, 2, 3, 4, 5])
+        .order("weekday", { ascending: true })
+        .order("period_index", { ascending: true }),
+      supabase.from("teachers").select("id,name,short_name").eq("school_id", schoolId),
+    ]);
 
     const timeSlots = normalizeTimeSlots((timeSlotsRaw as any[]) ?? []);
     const slotById = new Map<string, any>(timeSlots.map((s: any) => [s.id, s]));
@@ -55,7 +58,7 @@ export async function GET(req: Request) {
       const { data, error } = await supabase
         .from("schedules")
         .select(
-          "id,teacher_id,class_id,subject_id,room_id,notes,activity_type,time_slot_id,\n" +
+          "id,teacher_id,class_id,subject_id,room_id,notes,activity_type,time_slot_id,is_teacher_absent,replacement_teacher_id,\n" +
             "time_slot:time_slots(weekday,period_index,starts_at,ends_at,shift),\n" +
             "class:classes(name),subject:subjects(name),teacher:teachers(name,short_name,display_order)"
         )
@@ -66,7 +69,7 @@ export async function GET(req: Request) {
         const { data: legacy } = await supabase
           .from("schedules")
           .select(
-            "id,teacher_id,class_id,subject_id,room_id,notes,time_slot_id,\n" +
+            "id,teacher_id,class_id,subject_id,room_id,notes,time_slot_id,is_teacher_absent,replacement_teacher_id,\n" +
               "time_slot:time_slots(weekday,period_index,starts_at,ends_at,shift),\n" +
               "class:classes(name),subject:subjects(name),teacher:teachers(name,short_name,display_order)"
           )
@@ -78,12 +81,16 @@ export async function GET(req: Request) {
       }
     }
 
+    const teachersById = new Map<string, any>(((teachersRaw as any[]) ?? []).map((t: any) => [String(t.id), t]));
+
     const items = schedules
       .map((s) => {
         const ts = s?.time_slot || slotById.get(s?.time_slot_id);
         const weekday = Number(ts?.weekday ?? 0);
         const period = Number(ts?.period_index ?? 0);
         const act = String(s?.activity_type ?? "AULA").trim().toUpperCase() === "HA" ? "HA" : "AULA";
+        const replacementTeacherId = s?.replacement_teacher_id ? String(s.replacement_teacher_id) : null;
+        const replacementTeacher = replacementTeacherId ? teachersById.get(replacementTeacherId) : null;
         return {
           id: String(s?.id ?? ""),
           teacherId: String(s?.teacher_id ?? ""),
@@ -97,6 +104,9 @@ export async function GET(req: Request) {
           className: s?.class?.name ?? null,
           subjectName: s?.subject?.name ?? null,
           notes: s?.notes ?? null,
+          isTeacherAbsent: Boolean(s?.is_teacher_absent),
+          replacementTeacherId,
+          replacementTeacherName: replacementTeacher ? teacherName(replacementTeacher) : null,
           display_order: Number(s?.teacher?.display_order ?? 9999),
         };
       })

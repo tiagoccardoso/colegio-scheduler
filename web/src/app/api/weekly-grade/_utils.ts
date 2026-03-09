@@ -43,7 +43,7 @@ export async function getState(args: { supabase: any; schoolId: string; shift: s
     const { data: sched } = await supabase
       .from("schedules")
       .select(
-        "id,time_slot_id,teacher_id,activity_type,class_id,subject_id,room_id,notes,time_slot:time_slots(weekday,period_index,shift),class:classes(name,shift),subject:subjects(name),room:rooms(name)",
+        "id,time_slot_id,teacher_id,activity_type,class_id,subject_id,room_id,notes,is_teacher_absent,replacement_teacher_id,time_slot:time_slots(weekday,period_index,shift),class:classes(name,shift),subject:subjects(name),room:rooms(name)",
       )
       .eq("school_id", schoolId)
       .in("time_slot_id", timeSlotIds);
@@ -164,5 +164,7 @@ export function scheduleSnapshot(s: any) {
     teacher_id: s.teacher_id,
     room_id: s.room_id ?? null,
     notes: s.notes ?? null,
+    is_teacher_absent: Boolean(s.is_teacher_absent),
+    replacement_teacher_id: s.replacement_teacher_id ?? null,
   };
 }

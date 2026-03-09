@@ -67,6 +67,8 @@ export function ScheduleEditorModal(props: {
     subjectId: string;
     roomId: string;
     notes: string;
+    isTeacherAbsent: boolean;
+    replacementTeacherId: string;
   };
   onClose: () => void;
   onSave: (args: {
@@ -78,6 +80,8 @@ export function ScheduleEditorModal(props: {
     subjectId?: string;
     roomId: string | null;
     notes: string | null;
+    isTeacherAbsent: boolean;
+    replacementTeacherId: string | null;
   }) => void;
   onDelete?: (scheduleId: string) => void;
 }) {
@@ -105,6 +109,8 @@ export function ScheduleEditorModal(props: {
   const [subjectId, setSubjectId] = useState(defaults.subjectId);
   const [roomId, setRoomId] = useState(defaults.roomId);
   const [notes, setNotes] = useState(defaults.notes);
+  const [isTeacherAbsent, setIsTeacherAbsent] = useState(defaults.isTeacherAbsent);
+  const [replacementTeacherId, setReplacementTeacherId] = useState(defaults.replacementTeacherId);
 
   useEffect(() => {
     setActivityType(defaults.activityType);
@@ -113,7 +119,19 @@ export function ScheduleEditorModal(props: {
     setSubjectId(defaults.subjectId);
     setRoomId(defaults.roomId);
     setNotes(defaults.notes);
-  }, [defaults.activityType, defaults.teacherId, defaults.classId, defaults.subjectId, defaults.roomId, defaults.notes, open]);
+    setIsTeacherAbsent(defaults.isTeacherAbsent);
+    setReplacementTeacherId(defaults.replacementTeacherId);
+  }, [
+    defaults.activityType,
+    defaults.teacherId,
+    defaults.classId,
+    defaults.subjectId,
+    defaults.roomId,
+    defaults.notes,
+    defaults.isTeacherAbsent,
+    defaults.replacementTeacherId,
+    open,
+  ]);
 
   const resolvedTeacherId = lockTeacherId ? String(lockTeacherId) : teacherId;
   const resolvedClassId = lockClassId ? String(lockClassId) : classId;
@@ -122,6 +140,10 @@ export function ScheduleEditorModal(props: {
 
   const teacher = useMemo(
     () => teachers.find((t) => t.id === resolvedTeacherId) ?? null,
+    [teachers, resolvedTeacherId],
+  );
+  const replacementOptions = useMemo(
+    () => teachers.filter((t) => t.id !== resolvedTeacherId),
     [teachers, resolvedTeacherId],
   );
 
@@ -138,7 +160,7 @@ export function ScheduleEditorModal(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center print:hidden">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-950">
+      <div className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-950">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <h3 className="text-base font-semibold">Editar slot</h3>
@@ -275,6 +297,50 @@ export function ScheduleEditorModal(props: {
             </label>
           </div>
 
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={isTeacherAbsent}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setIsTeacherAbsent(checked);
+                  if (!checked) setReplacementTeacherId("");
+                }}
+                className="h-4 w-4 rounded border-zinc-300"
+              />
+              Marcar falta do professor neste slot
+            </label>
+            <div className="mt-3 grid gap-2">
+              <span className="text-sm font-semibold">Professor substituto</span>
+              <select
+                value={replacementTeacherId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setReplacementTeacherId(next);
+                  if (next) setIsTeacherAbsent(true);
+                }}
+                disabled={!resolvedTeacherId || !isTeacherAbsent}
+                className={
+                  "h-10 rounded-xl border px-3 text-sm outline-none transition focus:border-zinc-400 dark:focus:border-zinc-600 " +
+                  (!resolvedTeacherId || !isTeacherAbsent
+                    ? "border-zinc-100 bg-zinc-100 text-zinc-500 dark:border-zinc-900 dark:bg-zinc-900 dark:text-zinc-400"
+                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950")
+                }
+              >
+                <option value="">Sem substituto definido</option>
+                {replacementOptions.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {teacherLabel(t)}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                Use quando o professor titular faltar e outro docente assumir a aula.
+              </span>
+            </div>
+          </div>
+
           <label className="grid gap-2">
             <span className="text-sm font-semibold">Observações</span>
             <textarea
@@ -305,6 +371,8 @@ export function ScheduleEditorModal(props: {
                   subjectId: at === "AULA" ? subjectId : undefined,
                   roomId: at === "AULA" && resolvedRoomId ? resolvedRoomId : null,
                   notes: notes ? notes : null,
+                  isTeacherAbsent,
+                  replacementTeacherId: isTeacherAbsent && replacementTeacherId ? replacementTeacherId : null,
                 });
               }}
               className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"

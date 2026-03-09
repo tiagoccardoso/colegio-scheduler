@@ -146,8 +146,8 @@ const visibleTeacherIds = teachers.map((t) => String((t as any).id));
     let schedules: any[] = [];
     if ((teacherId || allTeachers) && slotIds.length > 0) {
       const sel = hasActivityType
-        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes"
-        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes";
+        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes,is_teacher_absent,replacement_teacher_id"
+        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id";
 
       const q = supabase.from("schedules").select(sel).eq("school_id", schoolId).in("time_slot_id", slotIds);
       const res = allTeachers ? await q.in("teacher_id", visibleTeacherIds) : await q.eq("teacher_id", teacherId);
@@ -155,7 +155,7 @@ const visibleTeacherIds = teachers.map((t) => String((t as any).id));
       if (res.error) {
         const q2 = supabase
           .from("schedules")
-          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
           .eq("school_id", schoolId)
           .in("time_slot_id", slotIds);
         const legacy = allTeachers ? await q2.in("teacher_id", visibleTeacherIds) : await q2.eq("teacher_id", teacherId);
@@ -201,6 +201,8 @@ const baseGrid: Record<string, any> = {};
       const k = `${ts.weekday}-${ts.period_index ?? 0}`;
 
       const targetTeacherId = String(sc.teacher_id ?? "");
+      const replacementTeacherId = (sc as any)?.replacement_teacher_id ? String((sc as any).replacement_teacher_id) : null;
+      const replacementTeacher = replacementTeacherId ? teacherById.get(replacementTeacherId) : null;
       const targetGrid = allTeachers ? gridsByTeacher[targetTeacherId] : grid;
       if (!targetGrid) continue;
 
@@ -214,6 +216,9 @@ const baseGrid: Record<string, any> = {};
           subject: "Hora Atividade",
           room: null,
           notes: (sc as any)?.notes ?? null,
+          isTeacherAbsent: Boolean((sc as any)?.is_teacher_absent),
+          replacementTeacherId,
+          replacementTeacherName: replacementTeacher ? teacherLabel(replacementTeacher) : null,
         };
         continue;
       }
@@ -241,6 +246,9 @@ const baseGrid: Record<string, any> = {};
         subject: subjectLabel(subj),
         room: effRoom ? roomLabel(roomsById.get(String(effRoom))) : null,
         notes: (sc as any)?.notes ?? null,
+        isTeacherAbsent: Boolean((sc as any)?.is_teacher_absent),
+        replacementTeacherId,
+        replacementTeacherName: replacementTeacher ? teacherLabel(replacementTeacher) : null,
       };
     }
 

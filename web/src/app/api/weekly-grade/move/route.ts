@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   const { data: current } = await supabase
     .from("schedules")
-    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
     .eq("id", scheduleId)
     .eq("school_id", profile.school_id)
     .maybeSingle();
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
     .update({ teacher_id: targetTeacherId, time_slot_id: targetTimeSlotId })
     .eq("id", scheduleId)
     .eq("school_id", profile.school_id)
-    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+    .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
     .maybeSingle();
 
   if (error) return jsonError(error.message || "Falha ao mover.");

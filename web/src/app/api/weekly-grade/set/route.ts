@@ -28,10 +28,15 @@ export async function POST(req: Request) {
   const subjectId = String(body.subjectId || "");
   const roomId = body.roomId ? String(body.roomId) : null;
   const notes = body.notes ? String(body.notes) : null;
+  const isTeacherAbsent = Boolean(body.isTeacherAbsent);
+  const replacementTeacherId = isTeacherAbsent && body.replacementTeacherId ? String(body.replacementTeacherId) : null;
 
   if (!teacherId || !timeSlotId) return jsonError("Campos obrigatórios: professor e horário.");
   if (activityType === "AULA" && (!classId || !subjectId)) {
     return jsonError("Campos obrigatórios para Aula: turma e disciplina.");
+  }
+  if (replacementTeacherId && replacementTeacherId === teacherId) {
+    return jsonError("O professor substituto deve ser diferente do professor titular.");
   }
 
   const { data: slot } = await supabase
@@ -84,12 +89,11 @@ export async function POST(req: Request) {
     }
   }
 
-  // Identify existing schedule row
   let current: any = null;
   if (scheduleId) {
     const { data } = await supabase
       .from("schedules")
-      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
       .eq("id", scheduleId)
       .eq("school_id", profile.school_id)
       .maybeSingle();
@@ -97,21 +101,19 @@ export async function POST(req: Request) {
   }
 
   if (!current) {
-    // Prefer teacher+slot (represents the UI cell)
     const { data: byCell } = await supabase
       .from("schedules")
-      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
       .eq("school_id", profile.school_id)
       .eq("teacher_id", teacherId)
       .eq("time_slot_id", timeSlotId)
       .maybeSingle();
     current = byCell;
 
-    // Fallback for Aula: update existing row by class+slot (legacy behavior)
     if (!current && activityType === "AULA") {
       const { data: byClassSlot } = await supabase
         .from("schedules")
-        .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+        .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
         .eq("school_id", profile.school_id)
         .eq("class_id", classId)
         .eq("time_slot_id", timeSlotId)
@@ -128,8 +130,46 @@ export async function POST(req: Request) {
     room_id: activityType === "AULA" ? resolvedRoomId : null,
     schedule_id: current?.id ?? null,
   });
-
   if (conflict) return jsonError(conflict.message);
+
+  if (replacementTeacherId) {
+    const { data: replacementTeacher } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("id", replacementTeacherId)
+      .eq("school_id", profile.school_id)
+      .maybeSingle();
+    if (!replacementTeacher) return jsonError("Professor substituto não encontrado.");
+
+    const excludeId = current?.id ?? "00000000-0000-0000-0000-000000000000";
+
+    const { data: replacementAsTeacher } = await supabase
+      .from("schedules")
+      .select("id")
+      .eq("school_id", profile.school_id)
+      .eq("teacher_id", replacementTeacherId)
+      .eq("time_slot_id", timeSlotId)
+      .neq("id", excludeId)
+      .limit(1)
+      .maybeSingle();
+    if (replacementAsTeacher) {
+      return jsonError("Conflito: este professor substituto já possui outro compromisso neste horário.");
+    }
+
+    const { data: replacementAsReplacement } = await supabase
+      .from("schedules")
+      .select("id")
+      .eq("school_id", profile.school_id)
+      .eq("replacement_teacher_id", replacementTeacherId)
+      .eq("is_teacher_absent", true)
+      .eq("time_slot_id", timeSlotId)
+      .neq("id", excludeId)
+      .limit(1)
+      .maybeSingle();
+    if (replacementAsReplacement) {
+      return jsonError("Conflito: este professor substituto já está cobrindo outra aula neste horário.");
+    }
+  }
 
   const before = scheduleSnapshot(current);
 
@@ -144,6 +184,8 @@ export async function POST(req: Request) {
     subject_id: activityType === "AULA" ? subjectId : null,
     room_id: activityType === "AULA" ? resolvedRoomId : null,
     notes,
+    is_teacher_absent: isTeacherAbsent,
+    replacement_teacher_id: replacementTeacherId,
   };
 
   if (current?.id) {
@@ -152,7 +194,7 @@ export async function POST(req: Request) {
       .update(schedulePayload)
       .eq("id", current.id)
       .eq("school_id", profile.school_id)
-      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
       .maybeSingle();
     writeError = error;
     afterRow = data;
@@ -160,7 +202,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from("schedules")
       .insert({ school_id: profile.school_id, ...schedulePayload })
-      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+      .select("id,school_id,activity_type,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
       .maybeSingle();
     writeError = error;
     afterRow = data;
@@ -170,7 +212,6 @@ export async function POST(req: Request) {
 
   const after = scheduleSnapshot(afterRow);
 
-  // Sincroniza com o cadastro do professor (AULA) para que a Grade Semanal seja fonte de verdade
   try {
     await applyTeachingRulesForTransition({
       supabase,
@@ -179,7 +220,6 @@ export async function POST(req: Request) {
       to: after,
     });
   } catch (err: any) {
-    // rollback best-effort
     if (before?.id) {
       await supabase
         .from("schedules")

@@ -63,6 +63,9 @@ type ApiResp = {
       timeSlotId: string;
       scheduleId?: string;
       notes: string | null;
+      isTeacherAbsent?: boolean;
+      replacementTeacherId?: string | null;
+      replacementTeacherName?: string | null;
     }[];
   }[];
 };
@@ -107,6 +110,8 @@ export function GradesHaClient() {
         teacherId: string;
         slot: TimeSlotInfo;
         notes: string;
+        isTeacherAbsent: boolean;
+        replacementTeacherId: string;
       }
   >(null);
 
@@ -196,6 +201,9 @@ export function GradesHaClient() {
       starts_at: string | null;
       ends_at: string | null;
       notes: string | null;
+      isTeacherAbsent: boolean;
+      replacementTeacherId: string | null;
+      replacementTeacherName: string | null;
     }[] = [];
 
     for (const d of datasets || []) {
@@ -237,6 +245,9 @@ export function GradesHaClient() {
             starts_at: (slot as any)?.starts_at ?? null,
             ends_at: (slot as any)?.ends_at ?? null,
             notes: s.notes ?? null,
+            isTeacherAbsent: Boolean((s as any)?.isTeacherAbsent),
+            replacementTeacherId: (s as any)?.replacementTeacherId ?? null,
+            replacementTeacherName: (s as any)?.replacementTeacherName ?? null,
           });
         }
       }
@@ -392,6 +403,8 @@ export function GradesHaClient() {
                         teacherId: r.teacherId,
                         slot: r.slot,
                         notes: String(r.notes ?? ""),
+                        isTeacherAbsent: Boolean((r as any)?.isTeacherAbsent),
+                        replacementTeacherId: String((r as any)?.replacementTeacherId ?? ""),
                       });
                     }}
                   >
@@ -400,7 +413,14 @@ export function GradesHaClient() {
                     <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">{WEEKDAYS[r.weekday] ?? "—"}</td>
                     <td className="border border-zinc-200 p-2 text-center text-xs dark:border-zinc-800">{r.period_index}º</td>
                     <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">{time || "—"}</td>
-                    <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">{r.notes || "—"}</td>
+                    <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800">
+                      <div>{r.notes || "—"}</div>
+                      {r.isTeacherAbsent ? (
+                        <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-200">
+                          {r.replacementTeacherName ? `Falta • Subst.: ${r.replacementTeacherName}` : "Falta • sem substituto"}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="border border-zinc-200 p-2 text-xs dark:border-zinc-800 print:hidden">
                       {r.scheduleId ? (
                         <button
@@ -471,6 +491,8 @@ export function GradesHaClient() {
             subjectId: "",
             roomId: "",
             notes: editing.notes,
+            isTeacherAbsent: editing.isTeacherAbsent,
+            replacementTeacherId: editing.replacementTeacherId,
           }}
           onClose={() => setEditing(null)}
           onSave={async (payload) => {

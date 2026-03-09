@@ -157,8 +157,8 @@ export async function GET(req: Request) {
     let schedules: any[] = [];
     if (slotIds.length) {
       const sel = hasActivityType
-        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes"
-        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes";
+        ? "id,class_id,time_slot_id,subject_id,teacher_id,room_id,activity_type,notes,is_teacher_absent,replacement_teacher_id"
+        : "id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id";
 
       const res = await supabase
         .from("schedules")
@@ -170,7 +170,7 @@ export async function GET(req: Request) {
         // fallback p/ DB legado
         const legacy = await supabase
           .from("schedules")
-          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes")
+          .select("id,class_id,time_slot_id,subject_id,teacher_id,room_id,notes,is_teacher_absent,replacement_teacher_id")
           .eq("school_id", schoolId)
           .in("time_slot_id", slotIds);
         schedules = (legacy.data as any[]) ?? [];
@@ -203,6 +203,8 @@ export async function GET(req: Request) {
 
       const subj = subjectsById.get(sc.subject_id);
       const teach = teachersById.get(sc.teacher_id);
+      const replacementTeacherId = (sc as any)?.replacement_teacher_id ? String((sc as any).replacement_teacher_id) : null;
+      const replacementTeacher = replacementTeacherId ? teachersById.get(replacementTeacherId) : null;
       const cls = classes.find((c: any) => String(c.id) === classId);
 
       const effRoom = effectiveRoomId({
@@ -223,6 +225,9 @@ export async function GET(req: Request) {
         teacher: teacherLabel(teach),
         room: effRoom ? roomLabel(roomsById.get(effRoom)) : null,
         notes: (sc as any)?.notes ?? null,
+        isTeacherAbsent: Boolean((sc as any)?.is_teacher_absent),
+        replacementTeacherId,
+        replacementTeacherName: replacementTeacher ? teacherLabel(replacementTeacher) : null,
       };
     }
 

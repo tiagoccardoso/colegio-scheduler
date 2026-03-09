@@ -43,6 +43,9 @@ type GradeByClassResp = {
         teacher: string;
         room?: string | null;
         notes?: string | null;
+        isTeacherAbsent?: boolean;
+        replacementTeacherId?: string | null;
+        replacementTeacherName?: string | null;
       }
     >
   >;
@@ -54,7 +57,7 @@ type HaResp = {
   items: {
     teacherId: string;
     teacherName: string;
-    slots: { weekday: number; period_index: number | null; timeSlotId: string; notes: string | null }[];
+    slots: { weekday: number; period_index: number | null; timeSlotId: string; notes: string | null; isTeacherAbsent?: boolean; replacementTeacherId?: string | null; replacementTeacherName?: string | null }[];
   }[];
 };
 
@@ -96,6 +99,9 @@ type GeneralResp = {
     subjectName: string | null;
     roomName?: string | null;
     notes: string | null;
+    isTeacherAbsent?: boolean;
+    replacementTeacherId?: string | null;
+    replacementTeacherName?: string | null;
   }[];
 };
 
@@ -164,6 +170,8 @@ export function ScheduleGeneralClient(props: {
           subjectId: string;
           roomId: string;
           notes: string;
+          isTeacherAbsent: boolean;
+          replacementTeacherId: string;
         };
       }
   >(null);
@@ -307,7 +315,12 @@ export function ScheduleGeneralClient(props: {
   const haBySlot = useMemo(() => {
     const map: Record<
       string,
-      { teacherName: string; notes: string | null }[]
+      {
+        teacherName: string;
+        notes: string | null;
+        isTeacherAbsent: boolean;
+        replacementTeacherName: string | null;
+      }[]
     > = {};
 
     for (const t of haItems) {
@@ -318,7 +331,7 @@ export function ScheduleGeneralClient(props: {
         if (!p) continue;
         const k = `${wd}-${p}`;
         map[k] ||= [];
-        map[k].push({ teacherName: t.teacherName, notes: s.notes ?? null });
+        map[k].push({ teacherName: t.teacherName, notes: s.notes ?? null, isTeacherAbsent: Boolean((s as any)?.isTeacherAbsent), replacementTeacherName: (s as any)?.replacementTeacherName ?? null });
       }
     }
 
@@ -607,6 +620,8 @@ export function ScheduleGeneralClient(props: {
                                   subjectId: String((cell as any)?.subjectId ?? ""),
                                   roomId: String((cell as any)?.roomId ?? ""),
                                   notes: String((cell as any)?.notes ?? ""),
+                                  isTeacherAbsent: Boolean((cell as any)?.isTeacherAbsent),
+                                  replacementTeacherId: String((cell as any)?.replacementTeacherId ?? ""),
                                 },
                               });
                             }}
@@ -618,6 +633,14 @@ export function ScheduleGeneralClient(props: {
                                   {cell.teacher}
                                   {cell.room ? ` • ${cell.room}` : ""}
                                 </div>
+                                {(cell as any)?.isTeacherAbsent ? (
+                                  <div className="mt-1 grid gap-0.5">
+                                    <div className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">Falta</div>
+                                    <div className="text-[10px] text-zinc-600 dark:text-zinc-300">
+                                      {(cell as any)?.replacementTeacherName ? `Subst.: ${(cell as any).replacementTeacherName}` : "Sem substituto"}
+                                    </div>
+                                  </div>
+                                ) : null}
                               </div>
                             ) : null}
                           </td>
@@ -636,6 +659,11 @@ export function ScheduleGeneralClient(props: {
                                   <div className="text-[10px] text-zinc-600 dark:text-zinc-300">{it.teacherName}</div>
                                   {it.notes ? (
                                     <div className="text-[10px] text-zinc-600 dark:text-zinc-300">{it.notes}</div>
+                                  ) : null}
+                                  {it.isTeacherAbsent ? (
+                                    <div className="text-[10px] text-amber-700 dark:text-amber-200">
+                                      {it.replacementTeacherName ? `Falta • Subst.: ${it.replacementTeacherName}` : "Falta • sem substituto"}
+                                    </div>
                                   ) : null}
                                 </div>
                               ))}

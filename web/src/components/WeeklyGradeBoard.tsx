@@ -881,7 +881,7 @@ function EditorModal(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center print:hidden">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-950">
+      <div className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl dark:bg-zinc-950">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <h3 className="text-base font-semibold">Editar slot</h3>
