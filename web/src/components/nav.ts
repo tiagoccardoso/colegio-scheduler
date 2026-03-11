@@ -8,13 +8,17 @@ export type NavSection = {
   items: NavItem[];
 };
 
-// Ordem do menu:
-// 1) Dashboard
-// 2) Demais recursos
-//
-// Observação: "Assinaturas" não aparece no menu para evitar duplicidade.
-// O acesso fica no botão abaixo de "Painel do diretor".
 export const NAV_SECTIONS: NavSection[] = [
+  {
+    title: "Direção",
+    items: [
+      { href: "/director", label: "Painel do Diretor" },
+      { href: "/director/calendario", label: "Calendário" },
+      { href: "/director/equipe-pedagogica", label: "Equipe Pedagógica" },
+      { href: "/director/parametros-grade", label: "Parâmetros da grade" },
+      { href: "/billing", label: "Assinaturas" },
+    ],
+  },
   {
     title: "Início",
     items: [{ href: "/dashboard", label: "Dashboard" }],
@@ -46,13 +50,6 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/**
- * Retorna as seções do menu.
- *
- * Observação: o bloqueio/desbloqueio (visual e de navegação) é tratado na
- * UI (NavLinks) para que o usuário veja todas as opções, porém com
- * indicação clara do que fica indisponível até concluir a assinatura.
- */
 export function getNavSections(_params?: { subscribed?: boolean }): NavSection[] {
   return NAV_SECTIONS;
 }

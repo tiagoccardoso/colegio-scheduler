@@ -64,11 +64,7 @@ export function NavLinks(
 
   const sections = props.sections ?? NAV_SECTIONS;
   const isSubscribed = props.isSubscribed ?? true;
-
-  const reportsSection = sections.find((s) => s.title === "Relatórios");
-  const mainItems = sections
-    .filter((s) => s.title !== "Relatórios")
-    .flatMap((s) => s.items);
+  const dropdownSectionTitles = new Set(["Direção", "Relatórios"]);
 
   const goBilling = () => router.push(isDirector ? "/billing" : "/help");
 
@@ -173,42 +169,44 @@ export function NavLinks(
   };
 
   if (variant === "top") {
-    const reportsLocked = !isSubscribed;
     return (
-      <nav className="flex flex-wrap items-center gap-2">
-        {mainItems.map((l) => (
-          <LinkItem key={l.href} href={l.href} label={l.label} />
-        ))}
+      <nav className="flex w-full flex-wrap items-center gap-2">
+        {sections.map((section) => {
+          if (dropdownSectionTitles.has(section.title)) {
+            const sectionLocked = !isSubscribed;
+            return (
+              <details key={`${section.title}-${pathname}`} className="relative">
+                <summary
+                  className={
+                    "nav-pill list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden " +
+                    (sectionLocked ? "opacity-40 hover:opacity-60" : "")
+                  }
+                  title={sectionLocked ? "Bloqueado até concluir a assinatura" : undefined}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {sectionLocked ? <LockIcon className="h-4 w-4" /> : null}
+                    {section.title}
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4 opacity-70">
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </span>
+                </summary>
 
-        {reportsSection?.items?.length ? (
-          <details key={pathname} className="relative">
-            <summary
-              className={
-                "nav-pill list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden " +
-                (reportsLocked ? "opacity-40 hover:opacity-60" : "")
-              }
-              title={reportsLocked ? "Bloqueado até concluir a assinatura" : undefined}
-            >
-              <span className="inline-flex items-center gap-2">
-                {reportsLocked ? <LockIcon className="h-4 w-4" /> : null}
-                {reportsSection.title}
-                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4 opacity-70">
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </span>
-            </summary>
+                <div className="absolute left-0 z-20 mt-2 min-w-[240px] panel p-1">
+                  {section.items.map((l) => (
+                    <DropdownLinkItem key={l.href} href={l.href} label={l.label} />
+                  ))}
+                </div>
+              </details>
+            );
+          }
 
-            <div className="absolute left-0 z-20 mt-2 min-w-[240px] panel p-1">
-              {reportsSection.items.map((l) => (
-                <DropdownLinkItem key={l.href} href={l.href} label={l.label} />
-              ))}
-            </div>
-          </details>
-        ) : null}
+          return section.items.map((l) => <LinkItem key={l.href} href={l.href} label={l.label} />);
+        })}
       </nav>
     );
   }
