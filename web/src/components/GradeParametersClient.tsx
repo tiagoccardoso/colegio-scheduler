@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { GradeSolverSettings } from "@/lib/schedule/solver-settings";
 
@@ -16,6 +17,12 @@ type SolveResp = {
 export function GradeParametersClient(props: {
   initialSettings: GradeSolverSettings;
   schoolName?: string | null;
+  status?: {
+    matrixEntries: number;
+    classesWithMatrix: number;
+    classesWithDefaultRoom: number;
+    teachersWithDefaultRoom: number;
+  };
 }) {
   const [settings, setSettings] = useState<GradeSolverSettings>(props.initialSettings);
   const [saving, setSaving] = useState(false);
@@ -126,6 +133,41 @@ export function GradeParametersClient(props: {
 
   return (
     <div className="grid gap-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Link
+          href="/director/matriz-curricular"
+          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+        >
+          <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Matriz curricular</div>
+          <div className="mt-1 text-2xl font-semibold">{props.status?.matrixEntries ?? 0}</div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{props.status?.classesWithMatrix ?? 0} turma(s) com matriz cadastrada</div>
+        </Link>
+
+        <Link
+          href="/director/sala-padrao"
+          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+        >
+          <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Sala padrão — turmas</div>
+          <div className="mt-1 text-2xl font-semibold">{props.status?.classesWithDefaultRoom ?? 0}</div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">turma(s) com sala-base definida</div>
+        </Link>
+
+        <Link
+          href="/director/sala-padrao"
+          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+        >
+          <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Sala padrão — professores</div>
+          <div className="mt-1 text-2xl font-semibold">{props.status?.teachersWithDefaultRoom ?? 0}</div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">professor(es) com preferência de sala</div>
+        </Link>
+
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/40">
+          <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Efeito na grade</div>
+          <div className="mt-1 text-sm font-medium">Matriz + salas padrão</div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Os cadastros abaixo alimentam as heurísticas do Solve.</div>
+        </div>
+      </div>
+
       <div className="panel p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -200,9 +242,9 @@ export function GradeParametersClient(props: {
               className="h-4 w-4"
             />
             <span>
-              <strong>Priorizar sala padrão do professor</strong>
+              <strong>Priorizar sala padrão</strong>
               <span className="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">
-                Dá bônus às regras que utilizam a sala padrão do docente, quando disponível.
+                Dá bônus às regras que utilizam a sala padrão da turma e/ou do docente, quando disponível.
               </span>
             </span>
           </label>

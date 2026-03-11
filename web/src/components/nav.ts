@@ -15,6 +15,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/director", label: "Painel do Diretor" },
       { href: "/director/calendario", label: "Calendário" },
       { href: "/director/equipe-pedagogica", label: "Equipe Pedagógica" },
+      { href: "/director/matriz-curricular", label: "Matriz Curricular" },
+      { href: "/director/sala-padrao", label: "Sala Padrão" },
       { href: "/director/parametros-grade", label: "Parâmetros da grade" },
       { href: "/billing", label: "Assinaturas" },
     ],

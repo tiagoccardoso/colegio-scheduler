@@ -24,6 +24,7 @@ type SolverCandidate = {
   teacherId: string;
   teacherName: string;
   teacherDefaultRoomId: string | null;
+  classDefaultRoomId: string | null;
   classId: string;
   subjectId: string;
   roomId: string;
@@ -268,7 +269,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const [{ data: teachersRaw }, { data: reqRows }] = await Promise.all([
+    const [{ data: teachersRaw }, { data: reqRows }, { data: classesRaw }] = await Promise.all([
       supabase
         .from("teachers")
         .select("id,name,default_room_id,teaching_rules")
@@ -278,9 +279,19 @@ export async function POST(req: Request) {
         .from("class_subject_requirements")
         .select("class_id,subject_id,lessons_per_week")
         .eq("school_id", schoolId),
+      supabase
+        .from("classes")
+        .select("id,default_room_id")
+        .eq("school_id", schoolId),
     ]);
 
     const teachers = ((teachersRaw as any[]) ?? []).filter((t) => t?.id);
+    const classDefaultRoomById = new Map<string, string | null>(
+      ((classesRaw as any[]) ?? []).map((item) => [
+        String((item as any)?.id ?? ""),
+        (item as any)?.default_room_id ? String((item as any).default_room_id) : null,
+      ]),
+    );
     const reqByClassSubject = new Map<string, number>();
     for (const row of (reqRows as any[] | null) ?? []) {
       const key = `${String((row as any)?.class_id ?? "")}|${String((row as any)?.subject_id ?? "")}`;
@@ -334,6 +345,7 @@ export async function POST(req: Request) {
             teacherId,
             teacherName,
             teacherDefaultRoomId,
+            classDefaultRoomId: classDefaultRoomById.get(String(r.class_id)) ?? null,
             classId: String(r.class_id),
             subjectId: String(r.subject_id),
             roomId: String(r.room_id),
@@ -400,8 +412,9 @@ export async function POST(req: Request) {
         score -= settings.avoid_last_period_penalty;
       }
 
-      if (settings.prioritize_default_room && c.teacherDefaultRoomId && c.teacherDefaultRoomId === c.roomId) {
-        score += 2;
+      if (settings.prioritize_default_room) {
+        if (c.classDefaultRoomId && c.classDefaultRoomId === c.roomId) score += 3;
+        if (c.teacherDefaultRoomId && c.teacherDefaultRoomId === c.roomId) score += 2;
       }
 
       return score;
