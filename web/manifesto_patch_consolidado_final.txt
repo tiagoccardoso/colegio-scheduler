@@ -1,0 +1,19 @@
+Arquivos incluídos no patch consolidado final:
+
+db/patch_curriculum_matrix_builder.sql
+src/app/api/ai/build-global-schedule/route.ts
+src/app/api/ai/help/route.ts
+src/app/api/ai/setup/route.ts
+src/app/api/curriculum-matrix/_helpers.ts
+src/app/api/curriculum-matrix/build/route.ts
+src/app/api/curriculum-matrix/reset/route.ts
+src/app/api/curriculum-matrix/set/route.ts
+src/app/api/curriculum-matrix/state/route.ts
+src/app/curriculum-matrix/page.tsx
+src/app/dashboard/page.tsx
+src/app/director/matriz-curricular/page.tsx
+src/app/help/page.tsx
+src/components/CurriculumMatrixBoard.tsx
+src/components/CurriculumMatrixClient.tsx
+src/components/DashboardSetupChat.tsx
+src/components/nav.ts

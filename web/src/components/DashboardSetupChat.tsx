@@ -14,9 +14,9 @@ type SetupPlan = {
 };
 
 const SUGGESTIONS = [
+  "Cadastre apenas a disciplina Matemática.",
+  "Monte a matriz curricular do 7ºA manhã com Matemática 5 aulas, Português 4 aulas e Ciências 3 aulas por semana.",
   "Quero cadastrar do zero: disciplinas (Matemática, Português), salas (Sala 1, Sala 2), turmas (7ºA manhã, 7ºB manhã), horários (6 períodos de 50min, seg-sex, início 07:00) e as habilitações por horário dos professores. Exemplo: João (MANHÃ) — Seg 1: Matemática 7ºA Sala 1; Seg 2: Matemática 7ºB Sala 1; Qua 1: Matemática 7ºA Sala 1. Maria (MANHÃ) — Ter 1: Português 7ºA Sala 2; Sex 2: Português 7ºB Sala 2.",
-  "Cadastre disciplinas (Matemática, Português) e salas (Sala 1, Sala 2). Depois crie habilitações por horário: João — Seg 1 Matemática 7ºA Sala 1 (manhã); Maria — Seg 2 Português 7ºB Sala 2 (manhã).",
-  "Analise o que já existe e me diga o que falta (disciplinas, salas, turmas, horários e habilitações por horário dos professores: disciplina+sala+turma+turno+período+dia) para eu montar a grade do turno MANHÃ.",
 ];
 
 function isSupported() {
@@ -30,7 +30,7 @@ export function DashboardSetupChat() {
     {
       role: "assistant",
       content:
-        "Sou o assistente de parametrização. Me diga o que você quer cadastrar (disciplinas, salas, turmas, horários e professores). Para conseguir montar a grade automaticamente, eu preciso das HABILITAÇÕES POR HORÁRIO dos professores: disciplina + sala + turma + turno + período + dia da semana. Vou pedir o que faltar e, quando estiver tudo claro, deixo um plano pronto para você aplicar no sistema.",
+        "Sou o assistente de parametrização. Você pode pedir um cadastro avulso (por exemplo, só uma disciplina) ou um fluxo completo. Também posso montar a matriz curricular por turma antes dos professores, distribuindo disciplina + turma + aulas por semana. Só vou pedir habilitações por horário dos professores quando isso for realmente necessário.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -241,6 +241,11 @@ function isPlanLike(obj: any) {
       o?.classes ||
       o?.timeSlots ||
       o?.teachers ||
+      o?.curriculumMatrix ||
+      o?.matrix ||
+      o?.matrizCurricular ||
+      o?.matriz ||
+      o?.classSubjectRequirements ||
       o?.buildSchedule ||
       o?.schedule // alguns prompts antigos usavam schedule
   );
@@ -251,7 +256,7 @@ function normalizePlan(obj: any): { plan: SetupPlan | null; raw: string | null }
   const base = obj?.payload && typeof obj.payload === "object" ? obj.payload : obj;
   const plan: any = { ...base };
   if (!plan.action) plan.action = "apply";
-  if (plan.action !== "apply") return { plan: null, raw: null };
+  if (plan.action !== "apply" || !isPlanLike(plan)) return { plan: null, raw: null };
   return { plan: plan as SetupPlan, raw: JSON.stringify(plan, null, 2) };
 }
 
@@ -358,10 +363,10 @@ return (
         <div>
           <h2 className="text-lg font-semibold">IA para parametrização do sistema</h2>
           <p className="mt-1 muted max-w-prose">
-            Peça para cadastrar disciplinas, salas, turmas, horários e professores.
-            Para montar a grade automaticamente, informe as <b>habilitações por horário</b> de cada professor
-            (disciplina + sala + turma + turno + período + dia).
-            O assistente vai coletar os dados que faltarem e preparar um plano para aplicar no sistema.
+            Peça para cadastrar disciplinas, salas, turmas, horários, matriz curricular por turma ou professores.
+            Se o pedido for específico, o assistente prepara só aquele cadastro. Para distribuir disciplinas antes dos professores,
+            informe <b>turma + disciplina + aulas por semana</b>. As <b>habilitações por horário</b> dos professores só entram quando
+            você quiser cadastrar professores ou partir para a montagem automática da grade.
           </p>
         </div>
 
@@ -379,7 +384,7 @@ return (
               {
                 role: "assistant",
                 content:
-                  "Conversa limpa. Me diga o que você quer parametrizar (e para qual turno) e eu vou guiar o fluxo completo.",
+                  "Conversa limpa. Me diga o que você quer cadastrar — pode ser algo específico, como uma disciplina, ou uma matriz curricular por turma.",
               },
             ]);
           }}
@@ -470,7 +475,7 @@ return (
                 <div className="text-sm font-semibold">Plano pronto para aplicar</div>
                 <div className="muted text-sm">
                   Ao aplicar, os cadastros serão efetivados nas telas correspondentes (Disciplinas, Salas, Turmas,
-                  Horários e Professores). Para gerar a grade, use o menu <b>Montar Grade</b>.
+                  Horários, Matriz Curricular e Professores). Para gerar a grade, use o menu <b>Montar Grade</b>.
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -494,7 +499,7 @@ return (
         ) : null}
 
         <div className="mt-2 text-xs text-zinc-500">
-          Dica: descreva turno, dias da semana, quantidade de períodos e duração. Para professores, passe as habilitações por horário: dia + período + turma + disciplina + sala.
+          Dica: para matriz curricular, descreva turma + disciplina + aulas por semana. Para professores, passe as habilitações por horário: dia + período + turma + disciplina + sala.
         </div>
       </div>
     </div>

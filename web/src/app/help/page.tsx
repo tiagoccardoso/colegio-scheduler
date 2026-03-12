@@ -38,13 +38,16 @@ export default async function HelpPage() {
                 Em <strong>Cadastros</strong>, crie <strong>Disciplinas</strong>, <strong>Salas</strong>, <strong>Turmas</strong> e <strong>Horários</strong>.
               </li>
               <li>
+                Em <strong>Matriz Curricular</strong>, distribua as disciplinas por turma e defina as aulas por semana mesmo antes de cadastrar professores.
+              </li>
+              <li>
                 Cadastre <strong>Professores</strong> e configure: disciplina principal, salas permitidas, turmas atendidas e disponibilidade.
               </li>
               <li>
                 Vá em <strong>Montar grade</strong> e selecione o <strong>turno</strong>. Ao entrar, o sistema monta a grade geral automaticamente quando ainda não existe.
               </li>
               <li>
-                Use os relatórios em <strong>Relatórios</strong> para revisar e ajustar: por turma, por sala e por professor.
+                Use os relatórios em <strong>Relatórios</strong> para revisar e ajustar: matriz curricular, por turma, por sala e por professor.
               </li>
             </ol>
 
@@ -69,11 +72,14 @@ export default async function HelpPage() {
                 <div className="mt-3 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300">
                   <p>
                     O sistema funciona melhor quando os cadastros estão completos. Siga esta ordem:
-                    <strong> Disciplinas → Salas → Turmas → Horários → Professores</strong>.
+                    <strong> Disciplinas → Salas → Turmas → Horários → Matriz Curricular → Professores</strong>.
                   </p>
                   <ul className="list-disc space-y-1 pl-5">
                     <li>
                       <strong>Horários</strong>: cadastre por dia (Seg–Sex) e por período (1º, 2º, 3º...), vinculando ao turno.
+                    </li>
+                    <li>
+                      <strong>Matriz Curricular</strong>: distribua disciplina + turma + aulas por semana antes da alocação de professores.
                     </li>
                     <li>
                       <strong>Professores</strong>: defina disciplina, turnos atendidos e disponibilidade por dia/período (isso evita conflitos).
@@ -86,7 +92,7 @@ export default async function HelpPage() {
                 <summary className="cursor-pointer text-sm font-semibold">Montar grade</summary>
                 <div className="mt-3 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300">
                   <p>
-                    Ao abrir <strong>Montar grade</strong>, o sistema monta a grade geral do turno (todas as turmas) usando o cadastro dos professores e a Hora Atividade (HA).
+                    Ao abrir <strong>Montar grade</strong>, o sistema monta a grade geral do turno (todas as turmas) usando o cadastro dos professores, a Hora Atividade (HA) e, quando existir, a matriz curricular por turma.
                   </p>
                   <ul className="list-disc space-y-1 pl-5">
                     <li>
@@ -108,6 +114,9 @@ export default async function HelpPage() {
                   <ul className="list-disc space-y-1 pl-5">
                     <li>
                       <strong>Grade semanal</strong>: visão geral do turno.
+                    </li>
+                    <li>
+                      <strong>Matriz curricular</strong>: mostra a distribuição das disciplinas por turma antes da alocação de professores.
                     </li>
                     <li>
                       <strong>Grade por turma/sala/professor</strong>: ideal para validar conflitos e imprimir.

@@ -32,6 +32,7 @@ type SetupPlan = {
   classes?: { name: string; shift?: string | null }[];
   timeSlots?: any;
   teachers?: any[];
+  curriculumMatrix?: any[];
   buildSchedule?: { shift?: string | null } | null;
 };
 
@@ -280,7 +281,113 @@ async function applySetupPlan(opts: {
     if (!firstClassId && c?.id) firstClassId = c.id;
   }
 
-  // 4) Time slots
+  // 4) Matriz curricular / distribuição de disciplinas por turma
+  const curriculumMatrixInput: any[] =
+    (Array.isArray((plan as any).curriculumMatrix) && (plan as any).curriculumMatrix) ||
+    (Array.isArray((plan as any).matrix) && (plan as any).matrix) ||
+    (Array.isArray((plan as any).matrizCurricular) && (plan as any).matrizCurricular) ||
+    (Array.isArray((plan as any).matriz) && (plan as any).matriz) ||
+    (Array.isArray((plan as any).classSubjectRequirements) && (plan as any).classSubjectRequirements) ||
+    [];
+
+  if (Array.isArray(curriculumMatrixInput) && curriculumMatrixInput.length) {
+    for (const rawRow of curriculumMatrixInput) {
+      if (!rawRow || typeof rawRow !== "object") continue;
+
+      const classRaw =
+        (rawRow as any).class ??
+        (rawRow as any).turma ??
+        (rawRow as any).class_name ??
+        (rawRow as any).className ??
+        (rawRow as any).class_id ??
+        null;
+      const subjectRaw =
+        (rawRow as any).subject ??
+        (rawRow as any).disciplina ??
+        (rawRow as any).subject_name ??
+        (rawRow as any).subjectName ??
+        (rawRow as any).subject_id ??
+        null;
+      const lessonsPerWeek = Math.max(
+        1,
+        Math.min(
+          40,
+          Number(
+            (rawRow as any).lessons_per_week ??
+              (rawRow as any).lessonsPerWeek ??
+              (rawRow as any).aulas_por_semana ??
+              (rawRow as any).aulasPerWeek ??
+              0,
+          ) || 0,
+        ),
+      );
+
+      const classIdRaw = asString((rawRow as any).class_id).trim();
+      const subjectIdRaw = asString((rawRow as any).subject_id).trim();
+      const className = getNameLike(classRaw).trim();
+      const subjectName = getNameLike(subjectRaw).trim();
+
+      const classId =
+        classIdRaw ||
+        (className.includes("-") ? className : classNameToId.get(normalizeKey(className)) || "");
+      const subjectId =
+        subjectIdRaw ||
+        (subjectName.includes("-") ? subjectName : subjectNameToId.get(normalizeKey(subjectName)) || "");
+
+      if (!classId || !subjectId || !lessonsPerWeek) {
+        warnings.push(
+          `Matriz curricular ignorada: verifique turma, disciplina e aulas/semana (${className || classId || "turma?"} / ${subjectName || subjectId || "disciplina?"}).`,
+        );
+        continue;
+      }
+
+      const payload = {
+        school_id: schoolId,
+        class_id: classId,
+        subject_id: subjectId,
+        lessons_per_week: lessonsPerWeek,
+      };
+
+      const { data: existing } = await admin
+        .from("class_subject_requirements")
+        .select("id")
+        .eq("school_id", schoolId)
+        .eq("class_id", classId)
+        .eq("subject_id", subjectId)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const { error } = await admin
+          .from("class_subject_requirements")
+          .update({ lessons_per_week: lessonsPerWeek })
+          .eq("id", existing.id)
+          .eq("school_id", schoolId);
+        if (error) {
+          warnings.push(
+            `Matriz curricular (${className || classId} / ${subjectName || subjectId}): ${error.message}`,
+          );
+          continue;
+        }
+        execLog.push(
+          `Matriz curricular atualizada: ${className || classId} — ${subjectName || subjectId} (${lessonsPerWeek} aulas/semana)`,
+        );
+        continue;
+      }
+
+      const { error } = await admin.from("class_subject_requirements").insert(payload);
+      if (error) {
+        warnings.push(
+          `Matriz curricular (${className || classId} / ${subjectName || subjectId}): ${error.message}`,
+        );
+        continue;
+      }
+      execLog.push(
+        `Matriz curricular criada: ${className || classId} — ${subjectName || subjectId} (${lessonsPerWeek} aulas/semana)`,
+      );
+    }
+  }
+
+  // 5) Time slots
   // Guardamos uma contagem padrão de períodos por turno para ajudar a criar disponibilidade de professores.
   const defaultPeriodCountByShift = new Map<string, number>();
   if (plan.timeSlots) {
@@ -807,6 +914,8 @@ async function applySetupPlan(opts: {
     revalidatePath("/time-slots");
     revalidatePath("/schedule");
     revalidatePath("/weekly-grade");
+    revalidatePath("/director/matriz-curricular");
+    revalidatePath("/director/parametros-grade");
   } catch {
     // ignore
   }
@@ -905,38 +1014,49 @@ const tr = await fetch(`${base}/audio/transcriptions`, {
 const SYSTEM_PROMPT = `
 Você é o assistente de parametrização do sistema "Colégio Scheduler".
 
-Objetivo: guiar o usuário para parametrizar tudo (Disciplinas, Salas, Turmas, Horários/Time Slots, Professores e, ao final, montar a grade do turno solicitado).
+Objetivo: permitir cadastros avulsos ou completos no sistema. Se o usuário pedir apenas uma coisa, foque apenas nessa coisa. Se ele pedir um fluxo completo, guie etapa por etapa.
 
 Regras:
 - Sempre trabalhe em português (Brasil).
-- Se faltarem dados, faça perguntas objetivas.
+- Se o pedido for específico (ex.: "cadastre a disciplina Matemática"), NÃO peça dados de áreas não relacionadas.
+- Se faltarem dados para aquele cadastro específico, faça perguntas objetivas e curtas.
 - Antes de executar qualquer cadastro, confirme um "plano" resumido do que será criado.
-- Quando o usuário confirmar, execute.
+- Quando o usuário confirmar, devolva somente o JSON do plano em bloco de código.
+- Nunca diga que montou a grade se ainda faltarem professores/habilitações.
 
-Dados essenciais que você deve coletar (se não vierem no pedido):
-1) Turno (MANHÃ/TARDE/NOITE) e dias da semana usados.
-2) Quantidade de períodos e duração em minutos (para criar os horários/time slots).
-3) Lista de disciplinas.
-4) Lista de salas.
-5) Lista de turmas (nome + turno).
-6) Professores: nome e, obrigatoriamente, as HABILITAÇÕES POR HORÁRIO para conseguir montar a grade:
+Como decidir o que coletar:
+1) Disciplinas: basta o nome (e short_name se o usuário informar).
+2) Salas: basta o nome.
+3) Turmas: nome + turno.
+4) Horários/time slots: turno, dias da semana, quantidade de períodos, duração em minutos e horário inicial.
+5) Matriz curricular / distribuição de disciplinas por turma (antes dos professores):
+   - Colete turma + disciplina + aulas por semana.
+   - Isso pode ser cadastrado mesmo sem professores definidos.
+   - Use isso quando o usuário quiser "distribuir disciplinas por turma", "montar a matriz" ou definir a carga semanal por disciplina.
+6) Professores:
+   - Só são necessários quando o usuário pedir cadastro de professores ou quiser montar a grade automática.
+   - Para montar a grade automaticamente, as HABILITAÇÕES POR HORÁRIO são obrigatórias.
    - Cada habilitação é uma combinação: disciplina + sala + turma + turno + período (+ dia da semana).
    - Exemplo: "João dá Matemática na Sala 1 para a Turma 7ºA na 2ª feira no 1º período da manhã".
    - Se o usuário não detalhar dias, pergunte. Se ele realmente quiser "seg-sex", então use weekdays [1,2,3,4,5].
-7) Restrições: indisponibilidades/HA, preferências, regras especiais.
+7) BuildSchedule só deve ser incluído se o usuário pedir explicitamente para montar/gerar a grade.
 
 Formato de resposta:
 - Responda com instruções claras.
-- Quando possível, termine com uma lista de perguntas faltantes.
+- Quando possível, termine com uma lista curta de perguntas faltantes.
 
 IMPORTANTE: nesta versão, você NÃO deve fingir que executou ações.
-Quando o usuário confirmar, responda com um JSON em um bloco de código contendo:
+Quando o usuário confirmar, responda com um JSON em um bloco de código contendo apenas as chaves necessárias para o pedido. Exemplo completo:
 {
   "action": "apply",
   "subjects": [{"name":"Matemática"}],
   "rooms": [{"name":"Sala 1"}],
   "classes": [{"name":"Turma A","shift":"MANHÃ"}],
   "timeSlots": {...},
+  "curriculumMatrix": [
+    {"class":"Turma A","subject":"Matemática","lessons_per_week":5},
+    {"class":"Turma A","subject":"Português","lessons_per_week":4}
+  ],
   "teachers": [
     {
       "name": "Nome do Professor",
@@ -950,8 +1070,14 @@ Quando o usuário confirmar, responda com um JSON em um bloco de código contend
   "buildSchedule": {"shift":"MANHÃ"}
 }
 
+Exemplos de pedidos específicos:
+- Se o pedido for apenas uma disciplina, devolva só: {"action":"apply","subjects":[{"name":"Matemática"}]}
+- Se o pedido for apenas uma turma, devolva só a chave "classes".
+- Se o pedido for apenas matriz curricular, devolva só a chave "curriculumMatrix" (e crie também subjects/classes apenas se o usuário pedir isso junto).
+
 Notas importantes sobre o formato:
 - Para subjects/rooms/classes, use sempre OBJETOS com a chave "name" (não use apenas strings).
+- Para curriculumMatrix, prefira usar nomes legíveis: "class", "subject" e "lessons_per_week".
 - Para professores, prefira usar "rulesByName" (habilitações por horário). O backend resolve nomes -> IDs.
 
 O backend valida e aplica.

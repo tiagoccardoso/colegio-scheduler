@@ -81,7 +81,7 @@ export default async function DashboardPage({
                 <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
                   <li>Cadastros ilimitados (turmas, professores, salas)</li>
                   <li>Montagem de grade com revisão de conflitos</li>
-                  <li>Relatórios (turma/sala/professor/hora atividade)</li>
+                  <li>Relatórios (matriz curricular/turma/sala/professor/hora atividade)</li>
                 </ul>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -197,6 +197,9 @@ export default async function DashboardPage({
                 </li>
                 <li>
                   Cadastre <strong>Horários</strong>
+                </li>
+                <li>
+                  Monte a <strong>Matriz Curricular</strong> por turma (distribuição de disciplinas) mesmo antes dos professores
                 </li>
                 <li>
                   Cadastre <strong>Professores</strong>

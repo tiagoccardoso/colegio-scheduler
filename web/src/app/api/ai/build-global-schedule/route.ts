@@ -3,6 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { validateNoConflicts } from "@/lib/schedule/validate";
 import { isStaffRole } from "@/lib/authz";
 import { normalizeGradeSolverSettings } from "@/lib/schedule/solver-settings";
+import {
+  teacherAcceptsShift,
+  teacherAllowedForClass,
+  teacherAllowsSubject,
+  teacherAvailable,
+} from "@/lib/teacher-rules";
 
 type BuildReq = {
   shift?: string | null;
@@ -31,6 +37,15 @@ type SolverCandidate = {
   slotId: string;
   weekday: number;
   periodIndex: number;
+};
+
+type MatrixRow = {
+  id: string;
+  class_id: string;
+  time_slot_id: string;
+  subject_id: string;
+  teacher_id: string | null;
+  notes: string | null;
 };
 
 const WEEKDAY_LABEL: Record<number, string> = {
@@ -104,6 +119,41 @@ function mapGetDayCount(map: Map<string, Map<number, number>>, key: string) {
     map.set(key, inner);
   }
   return inner;
+}
+
+function pickMatrixRoom(args: {
+  teacher: any;
+  classDefaultRoomId: string | null;
+  slot: any;
+  shift: string;
+  classId: string;
+  subjectId: string;
+  busyRoomsAtSlot: Set<string> | undefined;
+}) {
+  const { teacher, classDefaultRoomId, slot, shift, classId, subjectId, busyRoomsAtSlot } = args;
+  const rules = safeRules((teacher as any)?.teaching_rules).filter((rule) => {
+    if (normalizeShift(rule.shift) !== shift) return false;
+    if (String(rule.class_id) !== classId) return false;
+    if (String(rule.subject_id) !== subjectId) return false;
+    if (Number(rule.period_index) !== Number(slot?.period_index ?? 0)) return false;
+    const weekdays = rule.weekdays?.length ? rule.weekdays : DEFAULT_WEEKDAYS;
+    return weekdays.includes(Number(slot?.weekday ?? 0));
+  });
+
+  const preferred = [
+    ...rules.map((rule) => String(rule.room_id ?? "").trim()).filter(Boolean),
+    String((teacher as any)?.default_room_id ?? "").trim(),
+    String(classDefaultRoomId ?? "").trim(),
+  ].filter(Boolean);
+
+  const seen = new Set<string>();
+  for (const roomId of preferred) {
+    if (seen.has(roomId)) continue;
+    seen.add(roomId);
+    if (!busyRoomsAtSlot?.has(roomId)) return roomId;
+  }
+
+  return preferred[0] ?? null;
 }
 
 export async function POST(req: Request) {
@@ -269,10 +319,10 @@ export async function POST(req: Request) {
       }
     }
 
-    const [{ data: teachersRaw }, { data: reqRows }, { data: classesRaw }] = await Promise.all([
+    const [{ data: teachersRaw }, { data: reqRows }, { data: classesRaw }, { data: matrixRaw }] = await Promise.all([
       supabase
         .from("teachers")
-        .select("id,name,default_room_id,teaching_rules")
+        .select("id,name,default_room_id,teaching_rules,shifts,subject_id,subject_ids,class_ids,availability")
         .eq("school_id", schoolId)
         .order("name", { ascending: true }),
       supabase
@@ -283,15 +333,27 @@ export async function POST(req: Request) {
         .from("classes")
         .select("id,default_room_id")
         .eq("school_id", schoolId),
+      supabase
+        .from("curriculum_matrix_slots")
+        .select("id,class_id,time_slot_id,subject_id,teacher_id,notes")
+        .eq("school_id", schoolId)
+        .in("time_slot_id", slotIds)
+        .not("teacher_id", "is", null),
     ]);
 
     const teachers = ((teachersRaw as any[]) ?? []).filter((t) => t?.id);
+    const teacherById = new Map<string, any>(teachers.map((teacher) => [String(teacher.id), teacher]));
     const classDefaultRoomById = new Map<string, string | null>(
       ((classesRaw as any[]) ?? []).map((item) => [
         String((item as any)?.id ?? ""),
         (item as any)?.default_room_id ? String((item as any).default_room_id) : null,
       ]),
     );
+    const matrixRows = ((matrixRaw as MatrixRow[] | null) ?? []).filter((row) => {
+      if (!row?.teacher_id) return false;
+      if (requestedClassIds?.length && !requestedClassIds.includes(String(row.class_id))) return false;
+      return true;
+    });
     const reqByClassSubject = new Map<string, number>();
     for (const row of (reqRows as any[] | null) ?? []) {
       const key = `${String((row as any)?.class_id ?? "")}|${String((row as any)?.subject_id ?? "")}`;
@@ -317,6 +379,133 @@ export async function POST(req: Request) {
       const p = Number(ts.period_index ?? 0);
       const range = ts.starts_at ? `${ts.starts_at}–${ts.ends_at}` : p ? `${p}º` : "";
       return `${w} ${range}`.trim();
+    }
+
+    let matrixApplied = 0;
+    let matrixSkipped = 0;
+    for (const row of matrixRows) {
+      const teacherId = String(row.teacher_id ?? "").trim();
+      const classId = String(row.class_id ?? "").trim();
+      const slotId = String(row.time_slot_id ?? "").trim();
+      const subjectId = String(row.subject_id ?? "").trim();
+      const teacher = teacherById.get(teacherId);
+      const slot = slotById.get(slotId);
+
+      if (!teacher || !slot || !classId || !subjectId) {
+        skipped += 1;
+        matrixSkipped += 1;
+        warnings.push("Há vínculos da matriz curricular incompletos ou inválidos para este turno.");
+        continue;
+      }
+
+      if (!teacherAcceptsShift(teacher, requestedShift)) {
+        skipped += 1;
+        matrixSkipped += 1;
+        warnings.push(`Professor ${String(teacher.name ?? teacherId)} não atende o turno ${requestedShift} na matriz.`);
+        continue;
+      }
+      if (!teacherAllowedForClass(teacher, classId)) {
+        skipped += 1;
+        matrixSkipped += 1;
+        warnings.push(`Professor ${String(teacher.name ?? teacherId)} não está habilitado para a turma ${classId} na matriz.`);
+        continue;
+      }
+      if (!teacherAllowsSubject(teacher, subjectId)) {
+        skipped += 1;
+        matrixSkipped += 1;
+        warnings.push(`Professor ${String(teacher.name ?? teacherId)} não está habilitado para a disciplina vinculada na matriz.`);
+        continue;
+      }
+      if (
+        !teacherAvailable(teacher, {
+          shift: requestedShift,
+          weekday: Number(slot.weekday ?? 0),
+          period_index: Number(slot.period_index ?? 0),
+        })
+      ) {
+        skipped += 1;
+        matrixSkipped += 1;
+        warnings.push(`Professor ${String(teacher.name ?? teacherId)} está indisponível em ${slotLabel(slotId)}.`);
+        continue;
+      }
+
+      if (busyTeacher.get(slotId)?.has(teacherId)) {
+        conflictCounts.teacher += 1;
+        skipped += 1;
+        matrixSkipped += 1;
+        pushPreview(`Professor ocupado: ${String(teacher.name ?? teacherId)} em ${slotLabel(slotId)}.`);
+        continue;
+      }
+      if (busyClass.get(slotId)?.has(classId)) {
+        conflictCounts.class += 1;
+        skipped += 1;
+        matrixSkipped += 1;
+        pushPreview(`Turma já ocupada: ${classId} em ${slotLabel(slotId)}.`);
+        continue;
+      }
+
+      const roomId = pickMatrixRoom({
+        teacher,
+        classDefaultRoomId: classDefaultRoomById.get(classId) ?? null,
+        slot,
+        shift: requestedShift,
+        classId,
+        subjectId,
+        busyRoomsAtSlot: busyRoom.get(slotId),
+      });
+
+      const conflict = await validateNoConflicts({
+        supabase: supabase as any,
+        class_id: classId,
+        time_slot_id: slotId,
+        teacher_id: teacherId,
+        room_id: roomId || null,
+      });
+      if (conflict) {
+        if (conflict.kind === "teacher") conflictCounts.teacher += 1;
+        if (conflict.kind === "room") conflictCounts.room += 1;
+        if (conflict.kind === "class") conflictCounts.class += 1;
+        skipped += 1;
+        matrixSkipped += 1;
+        pushPreview(conflict.message);
+        continue;
+      }
+
+      const payload: any = {
+        school_id: schoolId,
+        class_id: classId,
+        time_slot_id: slotId,
+        teacher_id: teacherId,
+        subject_id: subjectId,
+        room_id: roomId || null,
+        notes: row.notes ?? null,
+      };
+      if (hasActivityType) payload.activity_type = "AULA";
+
+      const ins = await supabase.from("schedules").insert(payload);
+      if (ins.error) {
+        skipped += 1;
+        matrixSkipped += 1;
+        pushPreview(ins.error.message || `Falha ao aplicar vínculo da matriz em ${slotLabel(slotId)}.`);
+        continue;
+      }
+
+      applied += 1;
+      matrixApplied += 1;
+      busyTeacher.get(slotId) ?? busyTeacher.set(slotId, new Set());
+      busyTeacher.get(slotId)!.add(teacherId);
+      if (roomId) {
+        busyRoom.get(slotId) ?? busyRoom.set(slotId, new Set());
+        busyRoom.get(slotId)!.add(roomId);
+      }
+      busyClass.get(slotId) ?? busyClass.set(slotId, new Set());
+      busyClass.get(slotId)!.add(classId);
+      mapGetSet(teacherDayPeriods, `${teacherId}|${Number(slot.weekday ?? 0)}`).add(Number(slot.period_index ?? 0));
+      const subjectKey = `${classId}|${subjectId}`;
+      mapGetSet(classSubjectDayPeriods, `${subjectKey}|${Number(slot.weekday ?? 0)}`).add(Number(slot.period_index ?? 0));
+      const byDay = mapGetDayCount(classSubjectDayCount, subjectKey);
+      byDay.set(Number(slot.weekday ?? 0), (byDay.get(Number(slot.weekday ?? 0)) ?? 0) + 1);
+      classSubjectCount.set(subjectKey, (classSubjectCount.get(subjectKey) ?? 0) + 1);
     }
 
     const candidateKeys = new Set<string>();
@@ -510,6 +699,12 @@ export async function POST(req: Request) {
       );
     }
 
+    if (matrixApplied > 0 || matrixSkipped > 0) {
+      warnings.push(
+        `Matriz curricular com professor: aplicadas ${matrixApplied} vinculações fixas e ignoradas ${matrixSkipped}.`,
+      );
+    }
+
     const totalConflicts = conflictCounts.teacher + conflictCounts.room + conflictCounts.class;
     if (totalConflicts > 0) {
       warnings.push(
@@ -533,6 +728,7 @@ export async function POST(req: Request) {
       warnings,
       summary:
         `Solve executado com heurísticas configuráveis. Aplicadas: ${applied}. Ignoradas: ${skipped}. ` +
+        `Vínculos vindos da matriz: ${matrixApplied}. ` +
         `Pesos — consecutivas ${settings.prefer_consecutive_weight}, compactação ${settings.compact_teacher_days_weight}, janelas ${settings.reduce_teacher_gaps_weight}, último horário ${settings.avoid_last_period_penalty}, espalhamento ${settings.spread_subjects_weight}.`,
     });
   } catch (e: any) {

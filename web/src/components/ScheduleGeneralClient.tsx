@@ -9,6 +9,7 @@ import {
   type TeacherOption,
   type TimeSlotInfo,
 } from "@/components/ScheduleEditorModal";
+import { PrintButton } from "@/components/PrintButton";
 
 type GradeByClassResp = {
   ok: boolean;
@@ -441,6 +442,10 @@ export function ScheduleGeneralClient(props: {
           >
             Excluir grade
           </button>
+
+          <PrintButton className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold hover:bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-950 dark:hover:bg-zinc-900">
+            Imprimir
+          </PrintButton>
 
           <a
             href="/schedule/manual"

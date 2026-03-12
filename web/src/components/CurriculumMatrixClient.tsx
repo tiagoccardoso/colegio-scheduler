@@ -186,7 +186,7 @@ export function CurriculumMatrixClient(props: {
             <h2 className="text-base font-semibold">Matriz curricular por turma</h2>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
               Cadastre a quantidade de aulas por semana para cada disciplina de cada turma.
-              {props.schoolName ? ` Escola: ${props.schoolName}.` : ""} O Solve usa essa matriz para limitar e priorizar a montagem da grade.
+              {props.schoolName ? ` Escola: ${props.schoolName}.` : ""} Essa distribuição pode ser feita antes dos professores. Depois, o Solve usa essa matriz para limitar e priorizar a montagem da grade.
             </p>
           </div>
           <Link
