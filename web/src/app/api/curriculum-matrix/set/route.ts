@@ -68,16 +68,18 @@ export async function POST(req: Request) {
     if (!subjectRes.data) return jsonError("Disciplina não encontrada.");
 
     let teacherPayloadId: string | null = null;
+    let teacherRecord: any = null;
     if (teacherId) {
       const teacherRes = await ctx.supabase
         .from("teachers")
-        .select("id,name,shifts,subject_id,subject_ids,class_ids,availability")
+        .select("id,name,subject_id,subject_ids,shifts,class_ids,availability")
         .eq("id", teacherId)
         .eq("school_id", schoolId)
         .maybeSingle();
       if (!teacherRes.data) return jsonError("Professor não encontrado.");
 
       const teacher = teacherRes.data as any;
+      teacherRecord = teacher;
       const slot = slotRes.data as any;
       if (
         !teacherMatchesMatrixCell({
@@ -121,6 +123,29 @@ export async function POST(req: Request) {
         .select("id,class_id,time_slot_id,subject_id,teacher_id,notes")
         .maybeSingle();
       if (updateRes.error) return jsonError(updateRes.error.message || "Não foi possível salvar a célula.");
+
+      if (teacherPayloadId && teacherRecord) {
+        const mergedSubjectIds = Array.from(
+          new Set(
+            [String(teacherRecord.subject_id ?? "").trim(), ...((teacherRecord.subject_ids ?? []) as any[]).map(String), subjectId].filter(
+              Boolean,
+            ),
+          ),
+        );
+
+        const updateTeacherRes = await ctx.supabase
+          .from("teachers")
+          .update({
+            subject_ids: mergedSubjectIds,
+            subject_id: teacherRecord.subject_id ? teacherRecord.subject_id : mergedSubjectIds.length === 1 ? mergedSubjectIds[0] : null,
+          })
+          .eq("id", teacherPayloadId)
+          .eq("school_id", schoolId);
+        if (updateTeacherRes.error) {
+          return jsonError(updateTeacherRes.error.message || "Não foi possível atualizar as disciplinas do professor.");
+        }
+      }
+
       return NextResponse.json({ ok: true, cell: updateRes.data });
     }
 
@@ -138,6 +163,29 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (insertRes.error) return jsonError(insertRes.error.message || "Não foi possível salvar a célula.");
+
+    if (teacherPayloadId && teacherRecord) {
+      const mergedSubjectIds = Array.from(
+        new Set(
+          [String(teacherRecord.subject_id ?? "").trim(), ...((teacherRecord.subject_ids ?? []) as any[]).map(String), subjectId].filter(
+            Boolean,
+          ),
+        ),
+      );
+
+      const updateTeacherRes = await ctx.supabase
+        .from("teachers")
+        .update({
+          subject_ids: mergedSubjectIds,
+          subject_id: teacherRecord.subject_id ? teacherRecord.subject_id : mergedSubjectIds.length === 1 ? mergedSubjectIds[0] : null,
+        })
+        .eq("id", teacherPayloadId)
+        .eq("school_id", schoolId);
+      if (updateTeacherRes.error) {
+        return jsonError(updateTeacherRes.error.message || "Não foi possível atualizar as disciplinas do professor.");
+      }
+    }
+
     return NextResponse.json({ ok: true, cell: insertRes.data });
   } catch (e: any) {
     return jsonError(e?.message ?? "Erro inesperado.", 500);

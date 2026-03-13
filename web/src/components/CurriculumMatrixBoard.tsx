@@ -371,7 +371,7 @@ export function CurriculumMatrixBoard() {
           ) : null}
         </div>
         <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-          Distribuição de disciplinas por turma. Ao editar a célula, você também pode vincular o professor para transformar a matriz em base da montagem da grade. E, se a grade já existir, a matriz pode ser sincronizada a partir dela.
+          Distribuição de disciplinas por turma. Ao editar a célula, você também pode vincular o professor — inclusive um professor cadastrado apenas com o nome. Ao salvar, o cadastro dele é atualizado automaticamente com a disciplina atribuída na matriz. E, se a grade já existir, a matriz pode ser sincronizada a partir dela.
         </div>
       </div>
 
@@ -587,7 +587,7 @@ export function CurriculumMatrixBoard() {
                 {edit.subjectId ? (
                   <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
                     {eligibleTeachers.length
-                      ? "A lista mostra apenas professores compatíveis com esta disciplina, turma e horário."
+                      ? "A lista mostra apenas professores compatíveis com esta disciplina, turma e horário. Professores sem disciplina cadastrada também aparecem aqui."
                       : "Nenhum professor compatível encontrado para esta combinação. Você ainda pode salvar a disciplina sem professor."}
                   </div>
                 ) : (

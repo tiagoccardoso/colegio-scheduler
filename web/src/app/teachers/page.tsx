@@ -37,8 +37,36 @@ const SHIFTS: { key: string; label: string }[] = [
   { key: "NOITE", label: "Noite" },
 ];
 
+const ALL_SHIFT_KEYS = SHIFTS.map((item) => item.key);
+
 function uniq<T>(arr: T[]) {
   return Array.from(new Set(arr));
+}
+
+function normalizeTeacherScopeFromRules(derived: ReturnType<typeof deriveLegacyFieldsFromTeachingRules>, parsedRulesLength: number) {
+  if (parsedRulesLength > 0) {
+    return {
+      shifts: derived.shifts,
+      availability: derived.availability,
+      available_weekdays: derived.available_weekdays,
+      subject_id: derived.subject_id,
+      default_room_id: derived.default_room_id,
+      subject_ids: derived.subject_ids ?? [],
+      room_ids: derived.room_ids ?? [],
+      class_ids: derived.class_ids ?? [],
+    };
+  }
+
+  return {
+    shifts: ALL_SHIFT_KEYS,
+    availability: null,
+    available_weekdays: [1, 2, 3, 4, 5] as number[],
+    subject_id: null,
+    default_room_id: null,
+    subject_ids: [] as string[],
+    room_ids: [] as string[],
+    class_ids: [] as string[],
+  };
 }
 
 export default async function Page({
@@ -93,9 +121,12 @@ export default async function Page({
   }
 
   function labelShiftList(shifts: string[] | null | undefined) {
-    const arr = (shifts ?? []).map((s) => SHIFTS.find((x) => x.key === s)?.label ?? s).filter(Boolean);
-    return arr.length ? uniq(arr).join(", ") : "—";
+    const normalized = (shifts ?? []).map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+    if (normalized.length === 0 || ALL_SHIFT_KEYS.every((key) => normalized.includes(key))) return "Todos";
+    const arr = normalized.map((s) => SHIFTS.find((x) => x.key === s)?.label ?? s).filter(Boolean);
+    return arr.length ? uniq(arr).join(", ") : "Todos";
   }
+
 
   async function createAction(formData: FormData) {
     "use server";
@@ -104,11 +135,8 @@ export default async function Page({
     const criteria = String(formData.get("restrictions") || "").trim();
 
     const parsedRules = parseTeachingRulesJson(formData.get("teaching_rules_json"));
-    if (parsedRules.length === 0 && !criteria) {
-      redirect("/teachers?error=" + encodeMsg("Informe pelo menos uma turma vinculada ou preencha o campo Critérios."));
-    }
-
     const derived = deriveLegacyFieldsFromTeachingRules(parsedRules);
+    const normalizedScope = normalizeTeacherScopeFromRules(derived, parsedRules.length);
 
     const payload: any = {
       school_id: profile.school_id,
@@ -121,14 +149,14 @@ export default async function Page({
       teaching_rules: parsedRules,
 
       // Campos derivados (compatibilidade/legado)
-      shifts: derived.shifts,
-      availability: derived.availability,
-      available_weekdays: derived.available_weekdays,
-      subject_id: derived.subject_id,
-      default_room_id: derived.default_room_id,
-      subject_ids: derived.subject_ids ?? [],
-      room_ids: derived.room_ids ?? [],
-      class_ids: derived.class_ids ?? [],
+      shifts: normalizedScope.shifts,
+      availability: normalizedScope.availability,
+      available_weekdays: normalizedScope.available_weekdays,
+      subject_id: normalizedScope.subject_id,
+      default_room_id: normalizedScope.default_room_id,
+      subject_ids: normalizedScope.subject_ids,
+      room_ids: normalizedScope.room_ids,
+      class_ids: normalizedScope.class_ids,
     };
 
     if (!payload.name) redirect("/teachers?error=" + encodeMsg("Preencha o campo Nome."));
@@ -150,11 +178,8 @@ export default async function Page({
     const criteria = String(formData.get("restrictions") || "").trim();
 
     const parsedRules = parseTeachingRulesJson(formData.get("teaching_rules_json"));
-    if (parsedRules.length === 0 && !criteria) {
-      redirect("/teachers?error=" + encodeMsg("Informe pelo menos uma turma vinculada ou preencha o campo Critérios."));
-    }
-
     const derived = deriveLegacyFieldsFromTeachingRules(parsedRules);
+    const normalizedScope = normalizeTeacherScopeFromRules(derived, parsedRules.length);
 
     const payload: any = {
       name: String(formData.get("name") || "").trim() || null,
@@ -166,14 +191,14 @@ export default async function Page({
       teaching_rules: parsedRules,
 
       // Campos derivados (compatibilidade/legado)
-      shifts: derived.shifts,
-      availability: derived.availability,
-      available_weekdays: derived.available_weekdays,
-      subject_id: derived.subject_id,
-      default_room_id: derived.default_room_id,
-      subject_ids: derived.subject_ids ?? [],
-      room_ids: derived.room_ids ?? [],
-      class_ids: derived.class_ids ?? [],
+      shifts: normalizedScope.shifts,
+      availability: normalizedScope.availability,
+      available_weekdays: normalizedScope.available_weekdays,
+      subject_id: normalizedScope.subject_id,
+      default_room_id: normalizedScope.default_room_id,
+      subject_ids: normalizedScope.subject_ids,
+      room_ids: normalizedScope.room_ids,
+      class_ids: normalizedScope.class_ids,
     };
 
     if (!payload.name) redirect("/teachers?error=" + encodeMsg("Preencha o campo Nome."));
@@ -270,7 +295,7 @@ export default async function Page({
               />
 
               <label className="grid gap-2">
-                <span className="text-sm font-semibold">Critérios (opcional se houver turma vinculada)</span>
+                <span className="text-sm font-semibold">Critérios (opcional)</span>
                 <textarea
                   name="restrictions"
                   rows={3}
@@ -367,9 +392,12 @@ export default async function Page({
               </thead>
               <tbody>
                 {filteredRows.map((row) => {
-                  const subjectsLabel = row.subject_id
-                    ? subjectById.get(row.subject_id) || row.subject_id
-                    : labelList(row.subject_ids, subjectById, "—");
+                  const mergedSubjectIds = Array.from(
+                    new Set([String(row.subject_id ?? "").trim(), ...((row.subject_ids ?? []) as string[]).map(String)].filter(Boolean)),
+                  );
+                  const subjectsLabel = mergedSubjectIds.length
+                    ? mergedSubjectIds.map((id) => subjectById.get(id) || id).join(", ")
+                    : "Todas";
                   const classesLabel = labelList(row.class_ids, classById, "Todas");
                   const roomsLabel = row.default_room_id
                     ? roomById.get(row.default_room_id) || row.default_room_id
@@ -431,7 +459,7 @@ export default async function Page({
                               />
 
                               <label className="grid gap-2">
-                                <span className="text-sm font-semibold">Critérios (opcional se houver turma vinculada)</span>
+                                <span className="text-sm font-semibold">Critérios (opcional)</span>
                                 <textarea
                                   name="restrictions"
                                   rows={3}

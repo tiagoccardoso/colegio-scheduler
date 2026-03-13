@@ -1,0 +1,5 @@
+manifesto_patch_matriz_professor_auto_subject.txt
+src/app/api/curriculum-matrix/set/route.ts
+src/app/teachers/page.tsx
+src/components/CurriculumMatrixBoard.tsx
+src/lib/teacher-rules.ts

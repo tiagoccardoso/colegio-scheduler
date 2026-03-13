@@ -1,0 +1,2 @@
+manifesto_patch_fix_available_weekdays.txt
+src/app/teachers/page.tsx

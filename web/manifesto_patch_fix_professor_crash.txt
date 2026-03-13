@@ -1,0 +1,2 @@
+manifesto_patch_fix_professor_crash.txt
+src/app/teachers/page.tsx

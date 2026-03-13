@@ -1,0 +1,2 @@
+manifesto_patch_professor_todas.txt
+src/app/teachers/page.tsx

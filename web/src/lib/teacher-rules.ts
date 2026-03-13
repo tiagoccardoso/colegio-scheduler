@@ -39,11 +39,10 @@ export function teacherAllowsSubject(teacher: TeacherLike, subjectId: string) {
   if (!sid) return true;
 
   const primary = String(teacher.subject_id ?? "").trim();
-  if (primary) return primary === sid;
-
   const legacy = (teacher.subject_ids ?? []).map(String).filter(Boolean);
-  if (legacy.length === 0) return true;
-  return legacy.includes(sid);
+  const allowed = Array.from(new Set([primary, ...legacy].filter(Boolean)));
+  if (allowed.length === 0) return true;
+  return allowed.includes(sid);
 }
 
 export function teacherAllowsRoom(teacher: TeacherLike, roomId: string) {
