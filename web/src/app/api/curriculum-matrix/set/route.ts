@@ -1,6 +1,41 @@
 import { NextResponse } from "next/server";
 import { jsonError, normalizeShift, requireStaffApi, teacherMatchesMatrixCell } from "../_helpers";
 
+type MatrixCellLike = {
+  id: string;
+  class_id: string;
+  time_slot_id: string;
+  subject_id: string;
+  teacher_id?: string | null;
+  notes?: string | null;
+};
+
+function mergeTeacherSubjectIds(teacher: any, subjectId: string) {
+  return Array.from(
+    new Set(
+      [String(teacher?.subject_id ?? "").trim(), ...((teacher?.subject_ids ?? []) as any[]).map(String), subjectId].filter(Boolean),
+    ),
+  );
+}
+
+async function syncTeacherSubjects(args: { supabase: any; schoolId: string; teacherId: string; teacherRecord: any; subjectId: string }) {
+  const { supabase, schoolId, teacherId, teacherRecord, subjectId } = args;
+  const mergedSubjectIds = mergeTeacherSubjectIds(teacherRecord, subjectId);
+
+  const updateTeacherRes = await supabase
+    .from("teachers")
+    .update({
+      subject_ids: mergedSubjectIds,
+      subject_id: teacherRecord.subject_id ? teacherRecord.subject_id : mergedSubjectIds.length === 1 ? mergedSubjectIds[0] : null,
+    })
+    .eq("id", teacherId)
+    .eq("school_id", schoolId);
+
+  if (updateTeacherRes.error) {
+    throw new Error(updateTeacherRes.error.message || "Não foi possível atualizar as disciplinas do professor.");
+  }
+}
+
 export async function POST(req: Request) {
   const ctx = await requireStaffApi();
   if (!ctx) return jsonError("Não autorizado.", 401);
@@ -15,6 +50,7 @@ export async function POST(req: Request) {
     const subjectId = String(body?.subjectId ?? "").trim();
     const teacherId = String(body?.teacherId ?? "").trim();
     const notes = String(body?.notes ?? "").trim() || null;
+    const applyTeacherToSameSubject = Boolean(body?.applyTeacherToSameSubject);
 
     if (!classId || !timeSlotId) return jsonError("Turma e horário são obrigatórios.");
 
@@ -85,7 +121,6 @@ export async function POST(req: Request) {
         !teacherMatchesMatrixCell({
           teacher,
           classId,
-          subjectId,
           shift,
           slot: {
             weekday: Number(slot?.weekday ?? 0),
@@ -94,7 +129,7 @@ export async function POST(req: Request) {
         })
       ) {
         return jsonError(
-          `O professor ${String(teacher?.name ?? "selecionado")} não atende esta combinação de turma, disciplina e horário.`,
+          `O professor ${String(teacher?.name ?? "selecionado")} não atende esta combinação de turma e horário.`,
         );
       }
 
@@ -114,6 +149,7 @@ export async function POST(req: Request) {
       teacherPayloadId = teacherId;
     }
 
+    let savedCell: MatrixCellLike | null = null;
     if (existingId) {
       const updateRes = await ctx.supabase
         .from("curriculum_matrix_slots")
@@ -123,70 +159,114 @@ export async function POST(req: Request) {
         .select("id,class_id,time_slot_id,subject_id,teacher_id,notes")
         .maybeSingle();
       if (updateRes.error) return jsonError(updateRes.error.message || "Não foi possível salvar a célula.");
+      savedCell = updateRes.data as MatrixCellLike;
+    } else {
+      const insertRes = await ctx.supabase
+        .from("curriculum_matrix_slots")
+        .insert({
+          school_id: schoolId,
+          class_id: classId,
+          time_slot_id: timeSlotId,
+          subject_id: subjectId,
+          teacher_id: teacherPayloadId,
+          notes,
+        })
+        .select("id,class_id,time_slot_id,subject_id,teacher_id,notes")
+        .maybeSingle();
 
-      if (teacherPayloadId && teacherRecord) {
-        const mergedSubjectIds = Array.from(
-          new Set(
-            [String(teacherRecord.subject_id ?? "").trim(), ...((teacherRecord.subject_ids ?? []) as any[]).map(String), subjectId].filter(
-              Boolean,
-            ),
-          ),
-        );
-
-        const updateTeacherRes = await ctx.supabase
-          .from("teachers")
-          .update({
-            subject_ids: mergedSubjectIds,
-            subject_id: teacherRecord.subject_id ? teacherRecord.subject_id : mergedSubjectIds.length === 1 ? mergedSubjectIds[0] : null,
-          })
-          .eq("id", teacherPayloadId)
-          .eq("school_id", schoolId);
-        if (updateTeacherRes.error) {
-          return jsonError(updateTeacherRes.error.message || "Não foi possível atualizar as disciplinas do professor.");
-        }
-      }
-
-      return NextResponse.json({ ok: true, cell: updateRes.data });
+      if (insertRes.error) return jsonError(insertRes.error.message || "Não foi possível salvar a célula.");
+      savedCell = insertRes.data as MatrixCellLike;
     }
-
-    const insertRes = await ctx.supabase
-      .from("curriculum_matrix_slots")
-      .insert({
-        school_id: schoolId,
-        class_id: classId,
-        time_slot_id: timeSlotId,
-        subject_id: subjectId,
-        teacher_id: teacherPayloadId,
-        notes,
-      })
-      .select("id,class_id,time_slot_id,subject_id,teacher_id,notes")
-      .maybeSingle();
-
-    if (insertRes.error) return jsonError(insertRes.error.message || "Não foi possível salvar a célula.");
 
     if (teacherPayloadId && teacherRecord) {
-      const mergedSubjectIds = Array.from(
-        new Set(
-          [String(teacherRecord.subject_id ?? "").trim(), ...((teacherRecord.subject_ids ?? []) as any[]).map(String), subjectId].filter(
-            Boolean,
-          ),
-        ),
-      );
+      await syncTeacherSubjects({
+        supabase: ctx.supabase,
+        schoolId,
+        teacherId: teacherPayloadId,
+        teacherRecord,
+        subjectId,
+      });
+    }
 
-      const updateTeacherRes = await ctx.supabase
-        .from("teachers")
-        .update({
-          subject_ids: mergedSubjectIds,
-          subject_id: teacherRecord.subject_id ? teacherRecord.subject_id : mergedSubjectIds.length === 1 ? mergedSubjectIds[0] : null,
-        })
-        .eq("id", teacherPayloadId)
-        .eq("school_id", schoolId);
-      if (updateTeacherRes.error) {
-        return jsonError(updateTeacherRes.error.message || "Não foi possível atualizar as disciplinas do professor.");
+    let replicatedCount = 0;
+    const warnings: string[] = [];
+
+    if (teacherPayloadId && teacherRecord && applyTeacherToSameSubject) {
+      const shiftSlotsRes = await ctx.supabase
+        .from("time_slots")
+        .select("id,weekday,period_index")
+        .eq("school_id", schoolId)
+        .eq("shift", shift)
+        .in("weekday", [1, 2, 3, 4, 5]);
+      if (shiftSlotsRes.error) return jsonError(shiftSlotsRes.error.message || "Não foi possível carregar os horários do turno.");
+
+      const shiftSlotById = new Map(((shiftSlotsRes.data as any[]) ?? []).map((slot: any) => [String(slot.id), slot]));
+      const sameSubjectRes = await ctx.supabase
+        .from("curriculum_matrix_slots")
+        .select("id,class_id,time_slot_id,subject_id,teacher_id,notes")
+        .eq("school_id", schoolId)
+        .eq("class_id", classId)
+        .eq("subject_id", subjectId)
+        .neq("id", savedCell?.id ?? "");
+
+      if (sameSubjectRes.error) {
+        return jsonError(sameSubjectRes.error.message || "Não foi possível localizar as demais aulas da mesma disciplina.");
+      }
+
+      for (const cell of (sameSubjectRes.data as MatrixCellLike[] | null) ?? []) {
+        const slot = shiftSlotById.get(String(cell.time_slot_id));
+        if (!slot) continue;
+
+        if (
+          !teacherMatchesMatrixCell({
+            teacher: teacherRecord,
+            classId,
+            shift,
+            slot: {
+              weekday: Number((slot as any)?.weekday ?? 0),
+              period_index: Number((slot as any)?.period_index ?? 0),
+            },
+          })
+        ) {
+          warnings.push(`Professor indisponível em um dos demais horários da disciplina.`);
+          continue;
+        }
+
+        const teacherBusyMatrix = await ctx.supabase
+          .from("curriculum_matrix_slots")
+          .select("id,class_id")
+          .eq("school_id", schoolId)
+          .eq("time_slot_id", String(cell.time_slot_id))
+          .eq("teacher_id", teacherPayloadId)
+          .neq("class_id", classId)
+          .limit(1)
+          .maybeSingle();
+        if (teacherBusyMatrix.data?.id) {
+          warnings.push(`Professor já vinculado a outra turma em um dos demais horários da disciplina.`);
+          continue;
+        }
+
+        if (String(cell.teacher_id ?? "") === teacherPayloadId) continue;
+
+        const replicateRes = await ctx.supabase
+          .from("curriculum_matrix_slots")
+          .update({ teacher_id: teacherPayloadId })
+          .eq("id", String(cell.id))
+          .eq("school_id", schoolId);
+        if (replicateRes.error) {
+          warnings.push(replicateRes.error.message || "Não foi possível replicar o professor para todas as aulas da disciplina.");
+          continue;
+        }
+        replicatedCount += 1;
       }
     }
 
-    return NextResponse.json({ ok: true, cell: insertRes.data });
+    return NextResponse.json({
+      ok: true,
+      cell: savedCell,
+      replicatedCount,
+      warnings: Array.from(new Set(warnings)).slice(0, 5),
+    });
   } catch (e: any) {
     return jsonError(e?.message ?? "Erro inesperado.", 500);
   }

@@ -5,7 +5,6 @@ import { normalizeGradeSolverSettings } from "@/lib/schedule/solver-settings";
 import {
   teacherAcceptsShift,
   teacherAllowedForClass,
-  teacherAllowsSubject,
   teacherAvailable,
 } from "@/lib/teacher-rules";
 
@@ -155,15 +154,13 @@ export async function loadMatrixState(args: { supabase: any; schoolId: string; s
 export function teacherMatchesMatrixCell(args: {
   teacher: any;
   classId: string;
-  subjectId: string;
   shift: string;
   slot: { weekday: number; period_index: number | null };
 }) {
-  const { teacher, classId, subjectId, shift, slot } = args;
+  const { teacher, classId, shift, slot } = args;
   if (!teacher) return false;
   if (!teacherAcceptsShift(teacher, shift)) return false;
   if (!teacherAllowedForClass(teacher, classId)) return false;
-  if (!teacherAllowsSubject(teacher, subjectId)) return false;
   if (
     !teacherAvailable(teacher, {
       shift,

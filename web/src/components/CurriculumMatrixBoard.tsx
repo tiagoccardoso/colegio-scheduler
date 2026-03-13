@@ -205,16 +205,22 @@ export function CurriculumMatrixBoard() {
     if (!edit || !edit.subjectId) return [] as TeacherRow[];
     const slot = slotById.get(edit.timeSlotId);
     if (!slot) return [] as TeacherRow[];
-    return (data?.teachers || []).filter((teacher) => {
-      if (!teacherAcceptsShift(teacher, shift)) return false;
-      if (!teacherAllowedForClass(teacher, edit.classId)) return false;
-      if (!teacherAllowsSubject(teacher, edit.subjectId)) return false;
-      return teacherAvailable(teacher, {
-        shift,
-        weekday: Number(slot.weekday ?? 0),
-        period_index: Number(slot.period_index ?? 0),
+    return [...(data?.teachers || [])]
+      .filter((teacher) => {
+        if (!teacherAcceptsShift(teacher, shift)) return false;
+        if (!teacherAllowedForClass(teacher, edit.classId)) return false;
+        return teacherAvailable(teacher, {
+          shift,
+          weekday: Number(slot.weekday ?? 0),
+          period_index: Number(slot.period_index ?? 0),
+        });
+      })
+      .sort((a, b) => {
+        const aMatch = teacherAllowsSubject(a, edit.subjectId) ? 1 : 0;
+        const bMatch = teacherAllowsSubject(b, edit.subjectId) ? 1 : 0;
+        if (aMatch !== bMatch) return bMatch - aMatch;
+        return String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR");
       });
-    });
   }, [data?.teachers, edit, shift, slotById]);
 
   async function buildMatrix() {
@@ -265,6 +271,26 @@ export function CurriculumMatrixBoard() {
 
   async function saveCell() {
     if (!edit) return;
+
+    const subjectName = subjectById.get(edit.subjectId)?.name ?? "esta disciplina";
+    const teacherName = teacherById.get(edit.teacherId)?.name ?? "o professor selecionado";
+    const otherSameSubjectSlots =
+      edit.teacherId && edit.subjectId
+        ? (data?.cells || []).filter(
+            (cell) =>
+              cell.class_id === edit.classId &&
+              cell.subject_id === edit.subjectId &&
+              String(cell.id ?? "") !== String(edit.cellId ?? ""),
+          ).length
+        : 0;
+
+    const applyTeacherToSameSubject =
+      otherSameSubjectSlots > 0
+        ? window.confirm(
+            `Deseja vincular ${teacherName} também às demais aulas de ${subjectName} desta turma?`,
+          )
+        : false;
+
     setWorking(true);
     setBanner(null);
     try {
@@ -279,6 +305,7 @@ export function CurriculumMatrixBoard() {
           subjectId: edit.subjectId,
           teacherId: edit.teacherId,
           notes: edit.notes,
+          applyTeacherToSameSubject,
         }),
       });
       const json = await res.json();
@@ -287,7 +314,9 @@ export function CurriculumMatrixBoard() {
         return;
       }
       setEdit(null);
-      setBanner({ kind: "info", text: edit.subjectId ? "Célula atualizada." : "Célula limpa." });
+      const replicationText = Number(json?.replicatedCount ?? 0) > 0 ? ` Professor replicado em ${json.replicatedCount} aula(s) da mesma disciplina.` : "";
+      const warningsText = Array.isArray(json?.warnings) && json.warnings.length ? ` Avisos: ${json.warnings.join(" • ")}` : "";
+      setBanner({ kind: "info", text: `${edit.subjectId ? "Célula atualizada." : "Célula limpa."}${replicationText}${warningsText}` });
       await refresh(shift, false);
     } finally {
       setWorking(false);
@@ -371,7 +400,7 @@ export function CurriculumMatrixBoard() {
           ) : null}
         </div>
         <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-          Distribuição de disciplinas por turma. Ao editar a célula, você também pode vincular o professor — inclusive um professor cadastrado apenas com o nome. Ao salvar, o cadastro dele é atualizado automaticamente com a disciplina atribuída na matriz. E, se a grade já existir, a matriz pode ser sincronizada a partir dela.
+          Distribuição de disciplinas por turma. Ao editar a célula, você também pode vincular o professor — inclusive um professor cadastrado apenas com o nome. Ao salvar, o cadastro dele é atualizado automaticamente com a disciplina atribuída na matriz, inclusive quando ele passar a atuar em mais de uma disciplina.
         </div>
       </div>
 
@@ -587,7 +616,7 @@ export function CurriculumMatrixBoard() {
                 {edit.subjectId ? (
                   <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
                     {eligibleTeachers.length
-                      ? "A lista mostra apenas professores compatíveis com esta disciplina, turma e horário. Professores sem disciplina cadastrada também aparecem aqui."
+                      ? "A lista mostra professores compatíveis com a turma e o horário. Se a disciplina ainda não estiver no cadastro do professor, ela será adicionada automaticamente ao salvar."
                       : "Nenhum professor compatível encontrado para esta combinação. Você ainda pode salvar a disciplina sem professor."}
                   </div>
                 ) : (

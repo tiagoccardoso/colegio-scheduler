@@ -1,0 +1,4 @@
+manifesto_patch_matriz_multidisciplina.txt
+src/app/api/curriculum-matrix/_helpers.ts
+src/app/api/curriculum-matrix/set/route.ts
+src/components/CurriculumMatrixBoard.tsx
