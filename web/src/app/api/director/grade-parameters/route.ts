@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   DEFAULT_GRADE_SOLVER_SETTINGS,
@@ -60,19 +61,34 @@ export async function POST(req: Request) {
     const normalized = normalizeGradeSolverSettings(body ?? {});
     const payload = {
       school_id: String((profile as any).school_id),
-      ...normalized,
+      prefer_consecutive_weight: normalized.prefer_consecutive_weight,
+      compact_teacher_days_weight: normalized.compact_teacher_days_weight,
+      reduce_teacher_gaps_weight: normalized.reduce_teacher_gaps_weight,
+      avoid_last_period_penalty: normalized.avoid_last_period_penalty,
+      spread_subjects_weight: normalized.spread_subjects_weight,
+      respect_requirements: normalized.respect_requirements,
+      prioritize_default_room: normalized.prioritize_default_room,
       updated_by: user.id,
     };
 
-    const { error } = await supabase
+    const { data: saved, error } = await supabase
       .from("schedule_solver_settings")
-      .upsert(payload, { onConflict: "school_id" });
+      .upsert(payload, { onConflict: "school_id" })
+      .select("*")
+      .single();
 
     if (error) {
       return NextResponse.json({ error: error.message || "Falha ao salvar parâmetros." }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: true, settings: normalized });
+    try {
+      revalidatePath("/director/parametros-grade");
+      revalidatePath("/director/matriz-curricular");
+    } catch {
+      // noop
+    }
+
+    return NextResponse.json({ ok: true, settings: normalizeGradeSolverSettings(saved ?? payload) });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Erro inesperado." }, { status: 500 });
   }
