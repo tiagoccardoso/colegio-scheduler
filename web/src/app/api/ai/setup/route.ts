@@ -29,9 +29,12 @@ type SetupPlan = {
   // Ex.: subjects: ["Matemática"] / rooms: ["Sala 1"]. Normalizamos na aplicação.
   subjects?: ({ name: string; short_name?: string | null } | string)[];
   rooms?: ({ name: string; short_name?: string | null } | string)[];
-  classes?: { name: string; shift?: string | null }[];
+  classes?: any[];
   timeSlots?: any;
   teachers?: any[];
+  students?: any[];
+  schoolCurriculumSettings?: any | null;
+  schoolDocumentSettings?: any | null;
   curriculumMatrix?: any[];
   buildSchedule?: { shift?: string | null } | null;
 };
@@ -149,9 +152,28 @@ async function applySetupPlan(opts: {
       const name = getNameLike(s).trim();
       if (!name) continue;
       const short_name = typeof s === "object" ? (asString((s as any).short_name).trim() || null) : null;
+      const subjectPayload: any = {
+        school_id: schoolId,
+        name,
+        short_name,
+        component_type: asString((s as any)?.component_type).trim().toUpperCase() || null,
+        knowledge_area: asString((s as any)?.knowledge_area).trim().toUpperCase() || null,
+        nem_component_code: asString((s as any)?.nem_component_code).trim().toUpperCase() || null,
+        annual_hours: Number((s as any)?.annual_hours || 0) || null,
+        weekly_lessons_suggested: Number((s as any)?.weekly_lessons_suggested || 0) || null,
+        itinerary_axis: asString((s as any)?.itinerary_axis).trim().toUpperCase() || null,
+        syllabus: asString((s as any)?.syllabus).trim() || null,
+        teacher_qualification_required: asString((s as any)?.teacher_qualification_required).trim() || null,
+        curriculum_notes: asString((s as any)?.curriculum_notes).trim() || null,
+        is_mandatory: Boolean((s as any)?.is_mandatory),
+        is_digital_education: Boolean((s as any)?.is_digital_education),
+        is_project_of_life: Boolean((s as any)?.is_project_of_life),
+        is_elective: Boolean((s as any)?.is_elective),
+        is_professional_training: Boolean((s as any)?.is_professional_training),
+      };
       const { data, error } = await admin
         .from("subjects")
-        .insert({ school_id: schoolId, name, short_name })
+        .insert(subjectPayload)
         .select("id")
         .maybeSingle();
       if (error) {
@@ -200,11 +222,22 @@ async function applySetupPlan(opts: {
     for (const r of roomsInput) {
       const name = getNameLike(r).trim();
       if (!name) continue;
+      const roomPayload: any = {
+        school_id: schoolId,
+        name,
+        room_type: asString((r as any)?.room_type ?? (r as any)?.type).trim() || null,
+        room_number: Number((r as any)?.room_number || 0) || null,
+        display_order: Number((r as any)?.display_order || 0) || null,
+        capacity: Number((r as any)?.capacity || 0) || null,
+        building_block: asString((r as any)?.building_block).trim() || null,
+        supports_digital_education: Boolean((r as any)?.supports_digital_education),
+        supports_professional_training: Boolean((r as any)?.supports_professional_training),
+        is_accessible: Boolean((r as any)?.is_accessible),
+        notes: asString((r as any)?.notes).trim() || null,
+      };
       const { data, error } = await admin
         .from("rooms")
-        // A tabela `rooms` no projeto não possui `short_name` (apenas `name`, `room_number`, `display_order`, ...).
-        // Inserimos somente colunas garantidas para evitar erro "schema cache".
-        .insert({ school_id: schoolId, name })
+        .insert(roomPayload)
         .select("id")
         .maybeSingle();
       if (error) {
@@ -245,9 +278,25 @@ async function applySetupPlan(opts: {
       const name = asString((c as any).name).trim();
       if (!name) continue;
       const shift = normalizeShift((c as any).shift);
+      const classPayload: any = {
+        school_id: schoolId,
+        name,
+        shift,
+        series_year: asString((c as any)?.series_year).trim().toUpperCase() || null,
+        school_year: Number((c as any)?.school_year || 0) || null,
+        entry_cohort: Number((c as any)?.entry_cohort || 0) || null,
+        curriculum_version: asString((c as any)?.curriculum_version).trim() || null,
+        offer_model: asString((c as any)?.offer_model).trim().toUpperCase() || null,
+        itinerary_axis: asString((c as any)?.itinerary_axis).trim().toUpperCase() || null,
+        itinerary_name: asString((c as any)?.itinerary_name).trim() || null,
+        max_students: Number((c as any)?.max_students || 0) || null,
+        vacancies: Number((c as any)?.vacancies || 0) || null,
+        active: (c as any)?.active === false ? false : true,
+        pedagogical_notes: asString((c as any)?.pedagogical_notes).trim() || null,
+      };
       const { data, error } = await admin
         .from("classes")
-        .insert({ school_id: schoolId, name, shift })
+        .insert(classPayload)
         .select("id")
         .maybeSingle();
       if (error) {
@@ -279,6 +328,56 @@ async function applySetupPlan(opts: {
     if (n && c?.id) classNameToId.set(n, c.id);
     if (n && c?.shift) classNameToShift.set(n, normalizeShift(c.shift));
     if (!firstClassId && c?.id) firstClassId = c.id;
+  }
+
+  // 3.1) Configurações do painel Novo Ensino Médio
+  if (plan.schoolCurriculumSettings && typeof plan.schoolCurriculumSettings === "object") {
+    const cfg = plan.schoolCurriculumSettings as any;
+    const curriculumPayload: any = {
+      school_id: schoolId,
+      state_code: asString(cfg.state_code).trim().toUpperCase() || null,
+      state_curriculum_name: asString(cfg.state_curriculum_name).trim() || null,
+      state_curriculum_version: asString(cfg.state_curriculum_version).trim() || null,
+      state_reference_url: asString(cfg.state_reference_url).trim() || null,
+      curriculum_alignment_notes: asString(cfg.curriculum_alignment_notes).trim() || null,
+      total_annual_hours_target: Number(cfg.total_annual_hours_target || 0) || undefined,
+      fgb_min_hours_regular: Number(cfg.fgb_min_hours_regular || 0) || undefined,
+      itinerary_min_hours_regular: Number(cfg.itinerary_min_hours_regular || 0) || undefined,
+      state_override_total_annual_hours_target: Number(cfg.state_override_total_annual_hours_target || 0) || null,
+      state_override_fgb_min_hours_regular: Number(cfg.state_override_fgb_min_hours_regular || 0) || null,
+      state_override_itinerary_min_hours_regular: Number(cfg.state_override_itinerary_min_hours_regular || 0) || null,
+      state_override_min_itineraries_per_school: Number(cfg.state_override_min_itineraries_per_school || 0) || null,
+      min_itineraries_per_school: Number(cfg.min_itineraries_per_school || 0) || undefined,
+      required_fgb_codes_override: Array.isArray(cfg.required_fgb_codes_override) ? cfg.required_fgb_codes_override.map((x:any)=>asString(x).trim().toUpperCase()).filter(Boolean) : undefined,
+      enforce_digital_education: cfg.enforce_digital_education !== false,
+      enforce_project_of_life: cfg.enforce_project_of_life !== false,
+    };
+    const { error } = await admin.from("school_curriculum_settings").upsert(curriculumPayload, { onConflict: "school_id" });
+    if (error) warnings.push(`Configuração NEM: ${error.message}`);
+    else execLog.push("Configuração do painel Novo Ensino Médio atualizada.");
+  }
+
+  // 3.2) Configurações de Documentos NEM
+  if (plan.schoolDocumentSettings && typeof plan.schoolDocumentSettings === "object") {
+    const doc = plan.schoolDocumentSettings as any;
+    const docPayload: any = {
+      school_id: schoolId,
+      institution_name_override: asString(doc.institution_name_override).trim() || null,
+      network_name: asString(doc.network_name).trim() || null,
+      city: asString(doc.city).trim() || null,
+      state_code: asString(doc.state_code).trim().toUpperCase() || null,
+      ordinance_reference: asString(doc.ordinance_reference).trim() || null,
+      header_text: asString(doc.header_text).trim() || null,
+      footer_text: asString(doc.footer_text).trim() || null,
+      principal_name: asString(doc.principal_name).trim() || null,
+      principal_role_label: asString(doc.principal_role_label).trim() || null,
+      secretary_name: asString(doc.secretary_name).trim() || null,
+      secretary_role_label: asString(doc.secretary_role_label).trim() || null,
+      default_history_observation: asString(doc.default_history_observation).trim() || null,
+    };
+    const { error } = await admin.from("school_document_settings").upsert(docPayload, { onConflict: "school_id" });
+    if (error) warnings.push(`Configuração de Documentos NEM: ${error.message}`);
+    else execLog.push("Configuração de Documentos NEM atualizada.");
   }
 
   // 4) Matriz curricular / distribuição de disciplinas por turma
@@ -893,6 +992,17 @@ async function applySetupPlan(opts: {
         subject_ids: derived?.subject_ids ?? uniq(subject_ids),
         room_ids: derived?.room_ids ?? uniq(room_ids),
         class_ids: derived?.class_ids ?? uniq(class_ids),
+        cpf: asString((t as any).cpf).trim() || null,
+        academic_degree: asString((t as any).academic_degree).trim().toUpperCase() || null,
+        licensure_area: asString((t as any).licensure_area).trim() || null,
+        additional_areas: Array.isArray((t as any).additional_areas)
+          ? (t as any).additional_areas.map((x:any)=>asString(x).trim()).filter(Boolean)
+          : asString((t as any).additional_areas).split(',').map((x)=>x.trim()).filter(Boolean),
+        employee_code: asString((t as any).employee_code).trim() || null,
+        can_teach_nem: (t as any).can_teach_nem !== false,
+        can_teach_technical: Boolean((t as any).can_teach_technical),
+        curriculum_lattes_url: asString((t as any).curriculum_lattes_url).trim() || null,
+        training_notes: asString((t as any).training_notes).trim() || null,
       };
 
       if ((payload.subject_ids ?? []).length === 0) {
@@ -905,12 +1015,159 @@ async function applySetupPlan(opts: {
     }
   }
 
+  // 6) Students
+  if (Array.isArray((plan as any).students) && (plan as any).students.length) {
+    for (const s of (plan as any).students) {
+      if (!s || typeof s !== "object") continue;
+      const full_name = asString((s as any).full_name ?? (s as any).name).trim();
+      if (!full_name) continue;
+      const studentPayload: any = {
+        school_id: schoolId,
+        full_name,
+        registration_number: asString((s as any).registration_number).trim() || null,
+        social_name: asString((s as any).social_name).trim() || null,
+        birth_date: asString((s as any).birth_date).trim() || null,
+        status: asString((s as any).status).trim().toUpperCase() || 'ATIVO',
+        guardian_name: asString((s as any).guardian_name).trim() || null,
+        guardian_phone: asString((s as any).guardian_phone).trim() || null,
+        notes: asString((s as any).notes).trim() || null,
+        cpf: asString((s as any).cpf).trim() || null,
+        rg: asString((s as any).rg).trim() || null,
+        rg_issuer: asString((s as any).rg_issuer).trim() || null,
+        rg_state: asString((s as any).rg_state).trim().toUpperCase() || null,
+        birth_certificate_number: asString((s as any).birth_certificate_number).trim() || null,
+        nationality: asString((s as any).nationality).trim() || null,
+        naturalness_city: asString((s as any).naturalness_city).trim() || null,
+        naturalness_state: asString((s as any).naturalness_state).trim().toUpperCase() || null,
+        sex: asString((s as any).sex).trim().toUpperCase() || null,
+        gender_identity: asString((s as any).gender_identity).trim().toUpperCase() || null,
+        race_color: asString((s as any).race_color).trim().toUpperCase() || null,
+        email: asString((s as any).email).trim() || null,
+        phone: asString((s as any).phone).trim() || null,
+        mobile_phone: asString((s as any).mobile_phone).trim() || null,
+        zip_code: asString((s as any).zip_code).trim() || null,
+        street: asString((s as any).street).trim() || null,
+        street_number: asString((s as any).street_number).trim() || null,
+        address_complement: asString((s as any).address_complement).trim() || null,
+        neighborhood: asString((s as any).neighborhood).trim() || null,
+        city: asString((s as any).city).trim() || null,
+        state_code: asString((s as any).state_code).trim().toUpperCase() || null,
+        mother_name: asString((s as any).mother_name).trim() || null,
+        father_name: asString((s as any).father_name).trim() || null,
+        nis_number: asString((s as any).nis_number).trim() || null,
+        sus_card_number: asString((s as any).sus_card_number).trim() || null,
+        blood_type: asString((s as any).blood_type).trim() || null,
+        allergy_notes: asString((s as any).allergy_notes).trim() || null,
+        health_notes: asString((s as any).health_notes).trim() || null,
+        medication_notes: asString((s as any).medication_notes).trim() || null,
+        has_disability: Boolean((s as any).has_disability),
+        disability_details: asString((s as any).disability_details).trim() || null,
+        has_aee: Boolean((s as any).has_aee),
+        uses_school_transport: Boolean((s as any).uses_school_transport),
+        social_program_notes: asString((s as any).social_program_notes).trim() || null,
+        school_origin_name: asString((s as any).school_origin_name).trim() || null,
+        school_origin_network: asString((s as any).school_origin_network).trim().toUpperCase() || null,
+        school_origin_city: asString((s as any).school_origin_city).trim() || null,
+        school_origin_state: asString((s as any).school_origin_state).trim().toUpperCase() || null,
+        previous_school_year: Number((s as any).previous_school_year || 0) || null,
+        previous_grade: asString((s as any).previous_grade).trim() || null,
+        transfer_type: asString((s as any).transfer_type).trim().toUpperCase() || null,
+        transfer_date: asString((s as any).transfer_date).trim() || null,
+      };
+      const { data: studentData, error: studentErr } = await admin.from('students').insert(studentPayload).select('id').maybeSingle();
+      let studentId = asString((studentData as any)?.id).trim();
+      if (studentErr) {
+        const { data: found } = await admin.from('students').select('id,full_name').eq('school_id', schoolId).ilike('full_name', full_name).maybeSingle();
+        if (found?.id) {
+          studentId = String(found.id);
+          warnings.push(`Estudante '${full_name}' já existia (reutilizado).`);
+        } else {
+          warnings.push(`Estudante '${full_name}': ${studentErr.message}`);
+          continue;
+        }
+      } else {
+        execLog.push(`Estudante criado: ${full_name}`);
+      }
+
+      const enrollment = (s as any).enrollment;
+      if (studentId && enrollment && typeof enrollment === 'object') {
+        const className = asString(enrollment.class ?? enrollment.class_name).trim();
+        const classId = asString(enrollment.class_id).trim() || (className ? (classNameToId.get(normalizeKey(className)) || '') : '');
+        if (classId) {
+          const enrollmentPayload: any = {
+            school_id: schoolId,
+            student_id: studentId,
+            class_id: classId,
+            school_year: Number(enrollment.school_year || 0) || null,
+            entry_cohort: Number(enrollment.entry_cohort || 0) || null,
+            curriculum_version: asString(enrollment.curriculum_version).trim() || null,
+            offer_model: asString(enrollment.offer_model).trim().toUpperCase() || null,
+            enrollment_status: asString(enrollment.enrollment_status).trim().toUpperCase() || 'ATIVA',
+            itinerary_axis: asString(enrollment.itinerary_axis).trim().toUpperCase() || null,
+            itinerary_name: asString(enrollment.itinerary_name).trim() || null,
+            elective_name: asString(enrollment.elective_name).trim() || null,
+            project_of_life_notes: asString(enrollment.project_of_life_notes).trim() || null,
+            risk_level: asString(enrollment.risk_level).trim().toUpperCase() || 'BAIXO',
+            enrollment_date: asString(enrollment.enrollment_date).trim() || null,
+          };
+          const { error } = await admin.from('student_enrollments').insert(enrollmentPayload);
+          if (error) warnings.push(`Matrícula inicial de '${full_name}': ${error.message}`);
+          else execLog.push(`Matrícula inicial criada para ${full_name}.`);
+        } else {
+          warnings.push(`Estudante '${full_name}': turma da matrícula inicial não encontrada.`);
+        }
+      }
+
+      const guardians = Array.isArray((s as any).guardians) ? (s as any).guardians : [];
+      for (const g of guardians) {
+        if (!studentId || !g || typeof g !== 'object') continue;
+        const guardianName = asString(g.full_name ?? g.name).trim();
+        if (!guardianName) continue;
+        const guardianPayload: any = {
+          school_id: schoolId,
+          student_id: studentId,
+          guardian_type: asString(g.guardian_type).trim().toUpperCase() || null,
+          full_name: guardianName,
+          relationship: asString(g.relationship).trim().toUpperCase() || null,
+          cpf: asString(g.cpf).trim() || null,
+          rg: asString(g.rg).trim() || null,
+          phone: asString(g.phone).trim() || null,
+          mobile_phone: asString(g.mobile_phone).trim() || null,
+          email: asString(g.email).trim() || null,
+          profession: asString(g.profession).trim() || null,
+          is_legal_guardian: Boolean(g.is_legal_guardian),
+          is_financial_guardian: Boolean(g.is_financial_guardian),
+          lives_with_student: Boolean(g.lives_with_student),
+          zip_code: asString(g.zip_code).trim() || null,
+          street: asString(g.street).trim() || null,
+          street_number: asString(g.street_number).trim() || null,
+          address_complement: asString(g.address_complement).trim() || null,
+          neighborhood: asString(g.neighborhood).trim() || null,
+          city: asString(g.city).trim() || null,
+          state_code: asString(g.state_code).trim().toUpperCase() || null,
+          notes: asString(g.notes).trim() || null,
+        };
+        const { error } = await admin.from('student_guardians').insert(guardianPayload);
+        if (error) warnings.push(`Responsável de '${full_name}': ${error.message}`);
+      }
+
+      if (Array.isArray((s as any).documents) && (s as any).documents.length) {
+        warnings.push(`Estudante '${full_name}': os metadados de documentos foram recebidos, mas os arquivos precisam ser anexados manualmente na tela Documentos do aluno.`);
+      }
+    }
+  }
+
   // Revalidate related pages
   try {
     revalidatePath("/subjects");
     revalidatePath("/rooms");
     revalidatePath("/classes");
     revalidatePath("/teachers");
+    revalidatePath("/students");
+    revalidatePath("/students/historicos");
+    revalidatePath("/students/documentos");
+    revalidatePath("/director/novo-ensino-medio");
+    revalidatePath("/director/documentos-nem");
     revalidatePath("/time-slots");
     revalidatePath("/schedule");
     revalidatePath("/weekly-grade");
@@ -1011,23 +1268,25 @@ const tr = await fetch(`${base}/audio/transcriptions`, {
   return { message, transcript: transcript || null, chatLog };
 }
 
-const SYSTEM_PROMPT = `
-Você é o assistente de parametrização do sistema "Colégio Scheduler".
+function getSetupSystemPrompt(schoolName: string) {
+  return `
+Você é o assistente de parametrização de ${schoolName}.
 
-Objetivo: permitir cadastros avulsos ou completos no sistema. Se o usuário pedir apenas uma coisa, foque apenas nessa coisa. Se ele pedir um fluxo completo, guie etapa por etapa.
+Objetivo: permitir cadastros avulsos ou completos no sistema. Se o usuário pedir apenas uma coisa, foque apenas nessa coisa. Se ele pedir um fluxo completo, guie etapa por etapa. Também responda dúvidas sobre o Novo Ensino Médio quando elas estiverem ligadas ao uso das telas e dos cadastros do sistema.
 
 Regras:
 - Sempre trabalhe em português (Brasil).
 - Se o pedido for específico (ex.: "cadastre a disciplina Matemática"), NÃO peça dados de áreas não relacionadas.
+- Quando a dúvida for sobre Novo Ensino Médio, responda em termos práticos do sistema: campos, telas, fluxo e validações.
 - Se faltarem dados para aquele cadastro específico, faça perguntas objetivas e curtas.
 - Antes de executar qualquer cadastro, confirme um "plano" resumido do que será criado.
 - Quando o usuário confirmar, devolva somente o JSON do plano em bloco de código.
 - Nunca diga que montou a grade se ainda faltarem professores/habilitações.
 
 Como decidir o que coletar:
-1) Disciplinas: basta o nome (e short_name se o usuário informar).
-2) Salas: basta o nome.
-3) Turmas: nome + turno.
+1) Disciplinas: nome, e opcionalmente short_name, tipo curricular, área do conhecimento, código obrigatório da FGB, carga anual, aulas semanais, eixo do itinerário, ementa, observações curriculares e habilitação docente.
+2) Salas: nome, e opcionalmente tipo, capacidade, bloco, acessibilidade, observações e suporte a educação digital/formação técnica.
+3) Turmas: nome + turno, e opcionalmente série, ano letivo, coorte, versão curricular, modelo de oferta, eixo/nome do itinerário, capacidade, vagas, sala padrão e observações pedagógicas.
 4) Horários/time slots: turno, dias da semana, quantidade de períodos, duração em minutos e horário inicial.
 5) Matriz curricular / distribuição de disciplinas por turma (antes dos professores):
    - Colete turma + disciplina + aulas por semana.
@@ -1035,14 +1294,17 @@ Como decidir o que coletar:
    - Use isso quando o usuário quiser "distribuir disciplinas por turma", "montar a matriz" ou definir a carga semanal por disciplina.
 6) Professores:
    - Só são necessários quando o usuário pedir cadastro de professores ou quiser montar a grade automática.
+   - O cadastro pode incluir CPF, titulação, área principal de habilitação, áreas adicionais, matrícula/registro interno, currículo/Lattes e aptidão para NEM/técnico.
    - Para montar a grade automaticamente, as HABILITAÇÕES POR HORÁRIO são obrigatórias.
    - Cada habilitação é uma combinação: disciplina + sala + turma + turno + período (+ dia da semana).
    - Exemplo: "João dá Matemática na Sala 1 para a Turma 7ºA na 2ª feira no 1º período da manhã".
    - Se o usuário não detalhar dias, pergunte. Se ele realmente quiser "seg-sex", então use weekdays [1,2,3,4,5].
-7) BuildSchedule só deve ser incluído se o usuário pedir explicitamente para montar/gerar a grade.
+7) Estudantes: quando o usuário pedir, aceite cadastro civil, endereço, saúde, escola de origem, matrícula inicial, responsável principal, responsáveis adicionais, dados da trilha inicial e observações. Não invente upload de arquivos: documentos do estudante são anexados manualmente depois do cadastro.
+8) Configurações NEM e Documentos NEM: quando o usuário pedir, aceite schoolCurriculumSettings e schoolDocumentSettings considerando as novas telas e os novos campos.
+9) BuildSchedule só deve ser incluído se o usuário pedir explicitamente para montar/gerar a grade.
 
 Formato de resposta:
-- Responda com instruções claras.
+- Responda com instruções claras, considerando o fluxo recomendado das telas novas.
 - Quando possível, termine com uma lista curta de perguntas faltantes.
 
 IMPORTANTE: nesta versão, você NÃO deve fingir que executou ações.
@@ -1073,6 +1335,8 @@ Quando o usuário confirmar, responda com um JSON em um bloco de código contend
 Exemplos de pedidos específicos:
 - Se o pedido for apenas uma disciplina, devolva só: {"action":"apply","subjects":[{"name":"Matemática"}]}
 - Se o pedido for apenas uma turma, devolva só a chave "classes".
+- Se o pedido for apenas um estudante, devolva só a chave "students".
+- Se o pedido for apenas configuração do NEM ou documentos, devolva só a chave correspondente.
 - Se o pedido for apenas matriz curricular, devolva só a chave "curriculumMatrix" (e crie também subjects/classes apenas se o usuário pedir isso junto).
 
 Notas importantes sobre o formato:
@@ -1082,6 +1346,7 @@ Notas importantes sobre o formato:
 
 O backend valida e aplica.
 `;
+}
 
 export async function POST(req: Request) {
   try {
@@ -1132,6 +1397,12 @@ export async function POST(req: Request) {
     const supabase = await createClient();
     const { user, profile } = await getProfileForRequest(supabase, bearer);
     if (!user || !profile) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    const { data: school } = await supabase
+      .from("schools")
+      .select("name")
+      .eq("id", String((profile as any)?.school_id || ""))
+      .maybeSingle();
+    const schoolName = String((school as any)?.name || "Colégio Scheduler").trim() || "Colégio Scheduler";
 
     // Mensagem final enviada para o modelo (áudio tem prioridade)
     const userText = (transcript || message || "").trim();
@@ -1155,7 +1426,8 @@ export async function POST(req: Request) {
         store: false,
         max_completion_tokens: 900,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: getSetupSystemPrompt(schoolName) },
+          { role: "system", content: `Nome da escola: ${schoolName}. Use esse nome quando fizer sentido na resposta.` },
           ...chatLog.map((m) => ({ role: m.role, content: m.content })),
           { role: "user", content: userText },
         ],

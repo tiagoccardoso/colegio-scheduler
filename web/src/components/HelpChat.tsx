@@ -1,24 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const SUGGESTIONS = [
-  "Qual é o fluxo recomendado para começar?",
-  "Como cadastrar professores e definir disponibilidade?",
-  "Como montar a grade e revisar conflitos?",
-  "Como imprimir/baixar a grade por turma?",
-  "O que é Hora Atividade (HA) e como funciona?",
+  "Qual é o fluxo recomendado para começar os cadastros do NEM?",
+  "Como preencher disciplinas e turmas com os novos campos?",
+  "Como cadastrar estudantes, responsáveis e documentos?",
+  "Como usar Histórico e trilhas e Documentos do aluno?",
+  "Como montar a grade e revisar conflitos depois da matriz curricular?",
 ];
 
 export function HelpChat(props: { enabled?: boolean } = {}) {
   const enabled = props.enabled !== false;
+  const supabase = useMemo(() => createClient(), []);
+  const [schoolName, setSchoolName] = useState("Colégio Scheduler");
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
       content:
-        "Sou o assistente de ajuda do Colégio Scheduler. Pergunte qualquer coisa sobre o uso do sistema (cadastros, montagem de grade, relatórios, assinatura).",
+        "Sou o assistente de ajuda do Colégio Scheduler. Você pode perguntar qualquer coisa sobre o uso do sistema, especialmente sobre o Novo Ensino Médio, as novas telas, o fluxo de cadastro, documentos, grade curricular e relatórios.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -42,6 +45,51 @@ export function HelpChat(props: { enabled?: boolean } = {}) {
       </div>
     );
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth.user;
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("school_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const schoolId = String((profile as any)?.school_id || "").trim();
+        if (!schoolId) return;
+
+        const { data: school } = await supabase
+          .from("schools")
+          .select("name")
+          .eq("id", schoolId)
+          .maybeSingle();
+
+        const name = String((school as any)?.name || "").trim();
+        if (!cancelled && name) {
+          setSchoolName(name);
+          setMessages((prev) => {
+            if (!prev.length || prev[0]?.role !== "assistant") return prev;
+            const first = {
+              ...prev[0],
+              content: `Sou o assistente de ajuda do ${name}. Você pode perguntar qualquer coisa sobre o uso do sistema, especialmente sobre o Novo Ensino Médio, as novas telas, o fluxo de cadastro, documentos, grade curricular e relatórios.`,
+            };
+            return [first, ...prev.slice(1)];
+          });
+        }
+      } catch {
+        // fallback segue
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -90,7 +138,7 @@ export function HelpChat(props: { enabled?: boolean } = {}) {
         <div>
           <h2 className="text-lg font-semibold">Chat de ajuda</h2>
           <p className="mt-1 muted max-w-prose">
-            Este chat responde apenas sobre o uso do sistema. Se a pergunta não tiver relação, ele vai te redirecionar.
+            Este chat responde sobre o uso do sistema, com foco nas novas telas, no fluxo de cadastro e no Novo Ensino Médio. Se a pergunta não tiver relação, ele vai te redirecionar.
           </p>
         </div>
 
@@ -105,7 +153,7 @@ export function HelpChat(props: { enabled?: boolean } = {}) {
               {
                 role: "assistant",
                 content:
-                  "Conversa limpa. Me diga o que você quer fazer no Colégio Scheduler (cadastros, grade, relatórios).",
+                  `Conversa limpa. Me diga o que você quer fazer em ${schoolName} — por exemplo: cadastros, telas do Novo Ensino Médio, documentos, grade ou relatórios.`,
               },
             ]);
           }}
@@ -178,7 +226,7 @@ export function HelpChat(props: { enabled?: boolean } = {}) {
               className="textarea min-h-[44px]"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ex.: Como cadastrar horários e vincular turno?"
+              placeholder="Ex.: Como cadastrar turmas com coorte, itinerário e capacidade?"
             />
           </label>
 
@@ -188,7 +236,7 @@ export function HelpChat(props: { enabled?: boolean } = {}) {
         </form>
 
         <p className="text-xs text-zinc-500">
-          Dica: descreva o objetivo e onde você está no sistema (ex.: “Estou em Montar grade, turno Manhã…”).
+          Dica: descreva o objetivo, a tela e, se existir, a turma ou o cadastro envolvido (ex.: “Estou em Turmas e quero preencher coorte, oferta e itinerário do 1ºA”).
         </p>
       </div>
     </div>

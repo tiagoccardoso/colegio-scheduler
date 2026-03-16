@@ -14,9 +14,9 @@ type SetupPlan = {
 };
 
 const SUGGESTIONS = [
-  "Cadastre apenas a disciplina Matemática.",
-  "Monte a matriz curricular do 7ºA manhã com Matemática 5 aulas, Português 4 aulas e Ciências 3 aulas por semana.",
-  "Quero cadastrar do zero: disciplinas (Matemática, Português), salas (Sala 1, Sala 2), turmas (7ºA manhã, 7ºB manhã), horários (6 períodos de 50min, seg-sex, início 07:00) e as habilitações por horário dos professores. Exemplo: João (MANHÃ) — Seg 1: Matemática 7ºA Sala 1; Seg 2: Matemática 7ºB Sala 1; Qua 1: Matemática 7ºA Sala 1. Maria (MANHÃ) — Ter 1: Português 7ºA Sala 2; Sex 2: Português 7ºB Sala 2.",
+  "Cadastre apenas a disciplina Matemática com carga anual, aulas semanais e habilitação docente.",
+  "Monte a matriz curricular do 1ºA manhã com Matemática 5 aulas, Português 4 aulas e Ciências 3 aulas por semana antes de vincular professores.",
+  "Quero cadastrar do zero: disciplinas, salas, turmas, horários, matriz curricular por turma, professores com novos campos, estudantes e configurações do NEM.",
 ];
 
 function isSupported() {
@@ -25,12 +25,14 @@ function isSupported() {
 
 export function DashboardSetupChat() {
   const router = useRouter();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [schoolName, setSchoolName] = useState("Colégio Scheduler");
 
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
       content:
-        "Sou o assistente de parametrização. Você pode pedir um cadastro avulso (por exemplo, só uma disciplina) ou um fluxo completo. Também posso montar a matriz curricular por turma antes dos professores, distribuindo disciplina + turma + aulas por semana. Só vou pedir habilitações por horário dos professores quando isso for realmente necessário.",
+        "Sou o assistente de parametrização do Colégio Scheduler. Posso ajudar no cadastro de disciplinas, salas, turmas, horários, matriz curricular, professores, estudantes e configurações do NEM, sempre considerando as novas telas e os novos campos. Também organizo a matriz curricular por turma antes da vinculação dos professores e só solicito habilitações por horário quando necessário.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -47,6 +49,51 @@ export function DashboardSetupChat() {
   const chunksRef = useRef<BlobPart[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth.user;
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("school_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const schoolId = String((profile as any)?.school_id || "").trim();
+        if (!schoolId) return;
+
+        const { data: school } = await supabase
+          .from("schools")
+          .select("name")
+          .eq("id", schoolId)
+          .maybeSingle();
+
+        const name = String((school as any)?.name || "").trim();
+        if (!cancelled && name) {
+          setSchoolName(name);
+          setMessages((prev) => {
+            if (!prev.length || prev[0]?.role !== "assistant") return prev;
+            const first = {
+              ...prev[0],
+              content: `Sou o assistente de parametrização do ${name}. Posso ajudar no cadastro de disciplinas, salas, turmas, horários, matriz curricular, professores, estudantes e configurações do NEM, sempre considerando as novas telas e os novos campos. Também organizo a matriz curricular por turma antes da vinculação dos professores e só solicito habilitações por horário quando necessário.`,
+            };
+            return [first, ...prev.slice(1)];
+          });
+        }
+      } catch {
+        // fallback segue
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
@@ -58,7 +105,6 @@ export function DashboardSetupChat() {
 
   async function getAuthHeader(): Promise<Record<string, string>> {
     try {
-      const supabase = createSupabaseBrowserClient();
       const { data } = await supabase.auth.getSession();
       const token = data?.session?.access_token;
       return token ? { Authorization: `Bearer ${token}` } : {};
@@ -363,10 +409,10 @@ return (
         <div>
           <h2 className="text-lg font-semibold">IA para parametrização do sistema</h2>
           <p className="mt-1 muted max-w-prose">
-            Peça para cadastrar disciplinas, salas, turmas, horários, matriz curricular por turma ou professores.
+            Peça para cadastrar disciplinas, salas, turmas, horários, matriz curricular por turma, professores, estudantes ou configurações do NEM.
             Se o pedido for específico, o assistente prepara só aquele cadastro. Para distribuir disciplinas antes dos professores,
             informe <b>turma + disciplina + aulas por semana</b>. As <b>habilitações por horário</b> dos professores só entram quando
-            você quiser cadastrar professores ou partir para a montagem automática da grade.
+            você quiser cadastrar professores ou partir para a montagem automática da grade. O assistente também considera os novos campos das telas atualizadas.
           </p>
         </div>
 
@@ -384,7 +430,7 @@ return (
               {
                 role: "assistant",
                 content:
-                  "Conversa limpa. Me diga o que você quer cadastrar — pode ser algo específico, como uma disciplina, ou uma matriz curricular por turma.",
+                  `Conversa limpa. Me diga o que você quer cadastrar em ${schoolName} — por exemplo: disciplinas, salas, turmas, estudantes, documentos ou uma matriz curricular por turma.`,
               },
             ]);
           }}
