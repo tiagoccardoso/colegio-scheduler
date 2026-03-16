@@ -430,7 +430,7 @@ return (
               {
                 role: "assistant",
                 content:
-                  `Conversa limpa. Me diga o que você quer cadastrar em ${schoolName} — por exemplo: disciplinas, salas, turmas, estudantes, documentos ou uma matriz curricular por turma.`,
+                  `Conversa limpa. Me diga o que você quer cadastrar no ${schoolName} — por exemplo: disciplinas, salas, turmas, estudantes, documentos ou uma matriz curricular por turma.`,
               },
             ]);
           }}

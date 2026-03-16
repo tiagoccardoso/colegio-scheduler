@@ -1,9 +1,10 @@
 export type Option = { value: string; label: string };
 
 export const OFFER_MODEL_OPTIONS: Option[] = [
-  { value: "REGULAR_AREAS", label: "Regular por áreas" },
-  { value: "REGULAR_COM_ELETIVAS", label: "Regular com eletivas" },
-  { value: "TECNICO_INTEGRADO", label: "Técnico integrado" },
+  { value: "NEM_REGULAR", label: "Ensino médio regular por áreas" },
+  { value: "NEM_TECNICO_800", label: "Técnico articulado (800h)" },
+  { value: "NEM_TECNICO_1000", label: "Técnico articulado (1.000h)" },
+  { value: "NEM_TECNICO_1200", label: "Técnico articulado (1.200h)" },
   { value: "QUALIFICACAO_PROFISSIONAL", label: "Qualificação profissional" },
 ];
 
@@ -32,10 +33,17 @@ export const RISK_LEVEL_OPTIONS: Option[] = [
 export const ITINERARY_AXIS_OPTIONS: Option[] = [
   { value: "LINGUAGENS", label: "Linguagens e suas Tecnologias" },
   { value: "MATEMATICA", label: "Matemática e suas Tecnologias" },
-  { value: "NATUREZA", label: "Ciências da Natureza e suas Tecnologias" },
-  { value: "HUMANAS", label: "Ciências Humanas e Sociais Aplicadas" },
+  { value: "CIENCIAS_NATUREZA", label: "Ciências da Natureza e suas Tecnologias" },
+  { value: "CIENCIAS_HUMANAS", label: "Ciências Humanas e Sociais Aplicadas" },
   { value: "TECNICO", label: "Formação Técnica e Profissional" },
-  { value: "ELETIVAS", label: "Eletivas e aprofundamentos locais" },
+  { value: "INTEGRADO", label: "Percurso integrado / híbrido" },
+];
+
+export const ITINERARY_SELECTION_STATUS_OPTIONS: Option[] = [
+  { value: "PENDENTE", label: "Pendente" },
+  { value: "ESCOLHIDO", label: "Escolhido pelo estudante" },
+  { value: "ALOCAO_REDE", label: "Alocado pela rede/escola" },
+  { value: "ALTERADO", label: "Alterado posteriormente" },
 ];
 
 export const ATTENDANCE_STATUS_OPTIONS: Option[] = [
