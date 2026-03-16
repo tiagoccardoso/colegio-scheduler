@@ -187,28 +187,43 @@ export default async function DashboardPage({
               </div>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
                 <li>
-                  Cadastre <strong>Disciplinas</strong>
+                  Cadastre <strong>Disciplinas</strong> e classifique FGB, itinerários, técnico, Projeto de Vida e educação digital
                 </li>
                 <li>
                   Cadastre <strong>Salas</strong>
                 </li>
                 <li>
-                  Cadastre <strong>Turmas</strong>
+                  Cadastre <strong>Turmas</strong> com coorte, série e modelo de oferta do Novo Ensino Médio
+                </li>
+                <li>
+                  Configure o painel <strong>Novo Ensino Médio</strong> com as metas da rede
                 </li>
                 <li>
                   Cadastre <strong>Horários</strong>
                 </li>
                 <li>
-                  Monte a <strong>Matriz Curricular</strong> por turma (distribuição de disciplinas) mesmo antes dos professores
+                  Monte a <strong>Matriz Curricular</strong> por turma antes da grade, para não deixar a legislação refém do improviso semanal
                 </li>
                 <li>
                   Cadastre <strong>Professores</strong>
                 </li>
                 <li>
+                  Cadastre <strong>Estudantes</strong> e registre matrícula, coorte, itinerário e Projeto de Vida inicial
+                </li>
+                <li>
                   Monte a grade em <strong>Montar grade</strong>
                 </li>
                 <li>
-                  Revise e ajuste em <strong>Relatórios</strong>
+                  Lance frequência, avaliação e alertas em <strong>Acompanhamento do aluno</strong>
+                </li>
+                <li>
+                  Consolide <strong>Histórico e trilhas</strong> para acompanhar horas, progressão e formação técnica
+                </li>
+                <li>
+                  Revise <strong>Permanência NEM</strong> e <strong>Relatórios NEM</strong> no painel do diretor
+                </li>
+                <li>
+                  Configure <strong>Documentos NEM</strong> e emita declarações em <strong>Documentos do aluno</strong>
                 </li>
               </ol>
             </div>

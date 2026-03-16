@@ -15,7 +15,11 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/director", label: "Painel do Diretor" },
       { href: "/director/calendario", label: "Calendário" },
       { href: "/director/equipe-pedagogica", label: "Equipe Pedagógica" },
-            { href: "/director/sala-padrao", label: "Sala Padrão" },
+      { href: "/director/novo-ensino-medio", label: "Novo Ensino Médio" },
+      { href: "/director/permanencia", label: "Permanência NEM" },
+      { href: "/director/relatorios-nem", label: "Relatórios NEM" },
+      { href: "/director/documentos-nem", label: "Documentos NEM" },
+      { href: "/director/sala-padrao", label: "Sala Padrão" },
       { href: "/director/parametros-grade", label: "Parâmetros da grade" },
       { href: "/billing", label: "Assinaturas" },
     ],
@@ -28,6 +32,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Cadastros",
     items: [
       { href: "/subjects", label: "Disciplinas" },
+      { href: "/students", label: "Estudantes" },
       { href: "/rooms", label: "Salas" },
       { href: "/classes", label: "Turmas" },
       { href: "/time-slots", label: "Horários" },
@@ -38,6 +43,14 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Grade",
     items: [{ href: "/schedule", label: "Montar grade" }],
+  },
+  {
+    title: "Acompanhamento",
+    items: [
+      { href: "/students/acompanhamento", label: "Acompanhamento do aluno" },
+      { href: "/students/historicos", label: "Histórico e trilhas" },
+      { href: "/students/documentos", label: "Documentos do aluno" },
+    ],
   },
   {
     title: "Relatórios",
