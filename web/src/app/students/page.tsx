@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/require-staff";
@@ -999,7 +1000,11 @@ export default async function StudentsPage({
         </div>
 
         <div className="panel p-5">
-          <details open>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">Para matrícula assistida por documentos, use o fluxo de pré-matrícula inteligente antes do cadastro definitivo.</div>
+            <Link href="/students/pre-matricula" className="btn btn-secondary">Abrir pré-matrícula inteligente</Link>
+          </div>
+          <details open className="mt-4">
             <summary className="cursor-pointer text-sm font-semibold">Cadastrar estudante e matrícula inicial</summary>
             <form action={createAction} className="mt-4 grid gap-4">
               <StudentFormFields classes={classes} />
