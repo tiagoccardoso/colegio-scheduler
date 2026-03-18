@@ -1,25 +1,58 @@
-import Link from 'next/link'
 import { Badge, Card, PrimaryButton, SecondaryButton } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
 import { APP_URL } from '@/lib/app-url'
+
+const platformPillars = [
+  {
+    title: 'Operação escolar centralizada',
+    desc: 'Cadastros de professores, turmas, salas, disciplinas, horários e equipe pedagógica em um único fluxo.',
+  },
+  {
+    title: 'Grade com inteligência operacional',
+    desc: 'Monte, revise, ajuste conflitos e publique com relatórios por turma, professor e sala.',
+  },
+  {
+    title: 'Novo Ensino Médio com mais controle',
+    desc: 'Acompanhe FGB, itinerários, trilhas, regras curriculares e alertas de conformidade.',
+  },
+  {
+    title: 'Jornada do aluno',
+    desc: 'Da pré-matrícula ao histórico escolar, com acompanhamento, documentos e rastreabilidade.',
+  },
+]
+
+const valueCards = [
+  {
+    title: 'Menos retrabalho pedagógico',
+    desc: 'A matriz curricular, as regras da escola e a grade ficam conectadas, reduzindo ajustes manuais espalhados em planilhas.',
+  },
+  {
+    title: 'IA aplicada em tarefas reais',
+    desc: 'A IA ajuda no setup, sugere horários, apoia a resolução de conflitos, interpreta critérios e lê documentos da pré-matrícula.',
+  },
+  {
+    title: 'Mais visibilidade para a direção',
+    desc: 'Painéis, relatórios, calendário, documentos e acompanhamento escolar com visão executiva da operação acadêmica.',
+  },
+]
 
 export default function HomePage() {
   return (
     <div>
       <div className="grid items-center gap-10 py-12 md:grid-cols-2 md:py-16">
         <div>
-          <Badge>Organização escolar sem conflitos</Badge>
+          <Badge>Plataforma acadêmica com IA</Badge>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-900 sm:text-5xl">
-            IA que auxilia na organização
-            <span className="text-brand-700"> e monta a grade</span>.
+            Gestão acadêmica escolar com
+            <span className="text-brand-700"> IA, grade inteligente e conformidade curricular</span>.
           </h1>
           <p className="mt-5 text-base text-zinc-600 sm:text-lg">
-            Cadastre professores, turmas, disciplinas e salas. Descreva critérios (dias, períodos, preferências).
-            A inteligência artificial sugere horários, identifica conflitos e ajuda a corrigir antes de salvar.
+            O ClassFlow conecta cadastros, matriz curricular, horários, Novo Ensino Médio, acompanhamento do aluno,
+            documentos e relatórios em uma plataforma única para a rotina da escola.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <PrimaryButton href="/planos">Ver planos</PrimaryButton>
-            <SecondaryButton href="/treinamentos">Treinamentos</SecondaryButton>
+            <PrimaryButton href="/produto">Conhecer o produto</PrimaryButton>
+            <SecondaryButton href="/contato">Pedir demonstração</SecondaryButton>
             <a
               href={APP_URL}
               className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
@@ -35,19 +68,19 @@ export default function HomePage() {
           </div>
         </div>
 
-        <Card className="p-0 overflow-hidden">
+        <Card className="overflow-hidden p-0">
           <div className="border-b border-black/5 bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white">
-            <div className="text-sm font-semibold">Prévia do fluxo</div>
-            <div className="mt-2 text-2xl font-semibold tracking-tight">Critérios → Grade → Ajustes → Salvar</div>
+            <div className="text-sm font-semibold">Visão do fluxo</div>
+            <div className="mt-2 text-2xl font-semibold tracking-tight">Cadastros → Matriz → Grade → Aluno → Documentos</div>
             <p className="mt-2 text-sm text-white/85">
-              A IA transforma critérios em uma proposta de horário. Se houver conflito, ela sugere correções e você decide.
+              A plataforma organiza a base acadêmica da escola, aplica regras curriculares e reduz trabalho manual com apoio de IA.
             </p>
           </div>
           <div className="grid gap-4 p-6 sm:grid-cols-2">
-            <MiniFeature title="Critérios do professor" desc="Dias disponíveis, períodos, turmas e carga horária." />
-            <MiniFeature title="Detecção de conflitos" desc="Professor, turma ou sala ocupada no mesmo horário." />
-            <MiniFeature title="Resolver com IA" desc="Sugestões clicáveis e aplicar tudo de uma vez." />
-            <MiniFeature title="Relatórios" desc="Por turma, professor e sala — pronto para imprimir." />
+            <MiniFeature title="Novo Ensino Médio" desc="FGB, itinerários, trilhas e alertas de conformidade curricular." />
+            <MiniFeature title="Grade e conflitos" desc="Montagem automática, revisão manual, conflitos e sugestões aplicáveis." />
+            <MiniFeature title="Pré-matrícula inteligente" desc="Leitura de documentos, extração de dados e proposta de cadastro." />
+            <MiniFeature title="Direção e secretaria" desc="Relatórios, calendário, documentos escolares e visão executiva." />
           </div>
         </Card>
       </div>
@@ -55,36 +88,46 @@ export default function HomePage() {
       <Section>
         <SectionTitle
           kicker="Por que ClassFlow"
-          title="Menos planilhas. Menos retrabalho. Mais clareza."
-          description="O ClassFlow foi desenhado para o que mais consome tempo na escola: montar e ajustar grade." 
+          title="Mais do que montar horários: organize a operação acadêmica da escola"
+          description="O sistema foi pensado para escolas que precisam integrar rotina pedagógica, grade, conformidade curricular e documentação em um só lugar."
         />
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">Montagem mais rápida</div>
-            <p className="mt-2 text-sm text-zinc-600">Gere a grade do turno, revise e publique em minutos.</p>
-          </Card>
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">IA como copiloto</div>
-            <p className="mt-2 text-sm text-zinc-600">A IA sugere, explica e ajuda você a decidir. Você mantém o controle.</p>
-          </Card>
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">Conflitos resolvidos</div>
-            <p className="mt-2 text-sm text-zinc-600">Sugestões clicáveis e botão “Aplicar todas” para reduzir conflitos de uma vez.</p>
-          </Card>
+          {valueCards.map((card) => (
+            <Card key={card.title}>
+              <div className="text-sm font-semibold text-zinc-900">{card.title}</div>
+              <p className="mt-2 text-sm text-zinc-600">{card.desc}</p>
+            </Card>
+          ))}
+        </div>
+      </Section>
+
+      <Section className="pt-0">
+        <SectionTitle
+          kicker="Módulos principais"
+          title="O que a escola consegue operar dentro da plataforma"
+          description="Os módulos abaixo resumem o que já aparece no produto e como isso se traduz em ganho prático para direção, coordenação e secretaria."
+        />
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {platformPillars.map((pillar) => (
+            <Card key={pillar.title}>
+              <div className="text-sm font-semibold text-zinc-900">{pillar.title}</div>
+              <p className="mt-2 text-sm text-zinc-600">{pillar.desc}</p>
+            </Card>
+          ))}
         </div>
       </Section>
 
       <Section className="pt-0">
         <Card className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div>
-            <div className="text-sm font-semibold text-zinc-900">Pronto para começar?</div>
+            <div className="text-sm font-semibold text-zinc-900">Pronto para apresentar o fluxo completo da sua escola?</div>
             <p className="mt-2 text-sm text-zinc-600">
-              Assine e tenha acesso completo ao gerador de grade, cadastros, resolução de conflitos com IA e relatórios.
+              Veja como o ClassFlow pode conectar cadastros, grade, conformidade do Novo Ensino Médio, acompanhamento do aluno e emissão de documentos.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton href="/planos">Assinar agora</PrimaryButton>
-            <SecondaryButton href="/contato">Pedir demonstração</SecondaryButton>
+            <PrimaryButton href="/contato">Pedir demonstração</PrimaryButton>
+            <SecondaryButton href="/planos">Ver planos</SecondaryButton>
           </div>
         </Card>
       </Section>

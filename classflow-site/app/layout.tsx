@@ -5,15 +5,16 @@ import { SiteHeader } from '@/components/site-header'
 
 export const metadata: Metadata = {
   title: {
-    default: 'ClassFlow — Grade escolar com ajuda da IA',
+    default: 'ClassFlow — Gestão acadêmica escolar com IA',
     template: '%s — ClassFlow',
   },
-  description: 'A inteligência artificial auxilia na organização das regras da escola e monta automaticamente uma grade de horários sem conflitos.',
+  description:
+    'Plataforma de gestão acadêmica com IA para organizar cadastros, matriz curricular, grade, Novo Ensino Médio, jornada do aluno, documentos e relatórios escolares.',
   metadataBase: new URL('https://classflow.site'),
   openGraph: {
     title: 'ClassFlow',
     description:
-      'Organize horários escolares com ajuda da IA: cadastros, montagem de grade, detecção e resolução de conflitos e relatórios.',
+      'Organize a operação acadêmica da escola com IA: cadastros, grade, conformidade curricular, acompanhamento do aluno, documentos e relatórios.',
     type: 'website',
   },
   icons: [{ rel: 'icon', url: '/favicon.svg' }],

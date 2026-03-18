@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Flash } from "@/components/Flash";
 
-function Feature({ children }: { children: React.ReactNode }) {
+function Bullet({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-      <span aria-hidden="true" className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white dark:bg-white dark:text-zinc-950">
+    <li className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+      <span
+        aria-hidden="true"
+        className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/80 text-xs font-bold text-zinc-900 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+      >
         ✓
       </span>
       <span>{children}</span>
@@ -16,74 +19,132 @@ function Feature({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ValueCard({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="panel-inner p-4">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+        {eyebrow}
+      </div>
+      <div className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{title}</div>
+      <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{description}</p>
+    </div>
+  );
+}
+
+function JourneyStep({
+  number,
+  title,
+  description,
+}: {
+  number: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-sm font-semibold text-white shadow-sm dark:bg-white dark:text-zinc-950">
+        {number}
+      </div>
+      <div>
+        <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</div>
+        <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 function PlanCards({ onPick }: { onPick: (plan: "trial" | "monthly" | "yearly") => void }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-      <div className="text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">
-        Plano de assinatura
+    <div className="panel-solid p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+            Planos e ativação
+          </div>
+          <div className="mt-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Escolha como iniciar sua escola na plataforma
+          </div>
+        </div>
+        <div className="badge">Checkout seguro via Stripe</div>
       </div>
 
-      <div className="mt-3">
-        <div className="text-base font-semibold">Planos</div>
-        <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-          Acesso completo à plataforma de organização de horários com inteligência artificial.
-        </div>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+        Depois do login, o diretor conclui a assinatura e libera o uso completo da plataforma para a equipe.
+        O acesso inclui grade, calendário, NEM, estudantes, documentos e relatórios.
+      </p>
 
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-          <li>Cadastros ilimitados</li>
-          <li>Grade gerada com apoio da IA</li>
-          <li>Conflitos identificados e resolvidos</li>
-        </ul>
-
-        <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-          O acesso completo é liberado imediatamente após a confirmação da assinatura.
-        </p>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <div className="rounded-[28px] border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 p-5 shadow-sm dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900/70">
+          <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-semibold">Teste grátis</div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight">
-              {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias
-            </div>
-            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-              R$ 0 no período de teste. Cartão obrigatório. Cobrança após o trial no plano mensal.
-            </div>
-            <button type="button" onClick={() => onPick("trial")} className="btn btn-primary mt-4 w-full">
-              Começar teste grátis
-            </button>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100">
+              Melhor para começar
+            </span>
           </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-            <div className="text-sm font-semibold">Mensal</div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight">
-              {process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal"}
-            </div>
-            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Pagamento recorrente mensal.</div>
-            <button
-              type="button"
-              onClick={() => onPick("monthly")}
-              className="btn btn-primary mt-4 w-full"
-            >
-              Assinar mensal
-            </button>
+          <div className="mt-3 text-3xl font-semibold tracking-tight">
+            {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias
           </div>
-
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-            <div className="text-sm font-semibold">Anual</div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight">
-              {process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual"}
-            </div>
-            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Pagamento recorrente anual.</div>
-            <button
-              type="button"
-              onClick={() => onPick("yearly")}
-              className="btn btn-primary mt-4 w-full"
-            >
-              Assinar anual
-            </button>
-          </div>
+          <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Explore o sistema completo, valide a operação da escola e avance para o plano mensal ao fim do período.
+          </p>
+          <ul className="mt-4 space-y-2">
+            <Bullet>Onboarding da escola e diretor</Bullet>
+            <Bullet>Configuração inicial com apoio de IA</Bullet>
+            <Bullet>Checkout habilitado no fluxo da conta</Bullet>
+          </ul>
+          <button type="button" onClick={() => onPick("trial")} className="btn btn-primary mt-5 w-full">
+            Começar teste grátis
+          </button>
         </div>
 
-        <div className="mt-3 text-xs text-zinc-500">Você será direcionado para o checkout seguro do Stripe após entrar.</div>
+        <div className="rounded-[28px] border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 p-5 shadow-sm dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900/70">
+          <div className="text-sm font-semibold">Plano mensal</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight">
+            {process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal"}
+          </div>
+          <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Ideal para implantação rápida, com cobrança recorrente mensal e acesso contínuo para a escola.
+          </p>
+          <ul className="mt-4 space-y-2">
+            <Bullet>Gestão acadêmica completa</Bullet>
+            <Bullet>Grade, NEM, documentos e relatórios</Bullet>
+            <Bullet>IA aplicada à rotina escolar</Bullet>
+          </ul>
+          <button type="button" onClick={() => onPick("monthly")} className="btn btn-secondary mt-5 w-full">
+            Assinar plano mensal
+          </button>
+        </div>
+
+        <div className="rounded-[28px] border border-zinc-900 bg-zinc-900 p-5 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold">Plano anual</div>
+            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-950">
+              Melhor custo-benefício
+            </span>
+          </div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight">
+            {process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual"}
+          </div>
+          <p className="mt-3 text-sm leading-6 text-zinc-300 dark:text-zinc-700">
+            Para escolas que querem implantar, consolidar processos e operar o ano letivo inteiro na plataforma.
+          </p>
+          <ul className="mt-4 space-y-2 text-zinc-100 dark:text-zinc-800">
+            <Bullet>Melhor previsibilidade financeira</Bullet>
+            <Bullet>Implantação com continuidade ao longo do ano</Bullet>
+            <Bullet>Fluxo completo da escola em um só ambiente</Bullet>
+          </ul>
+          <button type="button" onClick={() => onPick("yearly")} className="btn mt-5 w-full bg-white text-zinc-950 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-white dark:hover:bg-zinc-900">
+            Assinar plano anual
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -108,8 +169,6 @@ export default function LoginPage() {
   const [redirectAfterLogin, setRedirectAfterLogin] = useState("/dashboard");
 
   function pickPlan(plan: "trial" | "monthly" | "yearly") {
-    // Após entrar, o usuário cai no dashboard com o menu travado e os planos visíveis.
-    // A contratação em si acontece em /billing.
     setRedirectAfterLogin(`/dashboard?plan=${plan}`);
     setMode("login");
     const label = plan === "trial" ? "com teste grátis" : plan === "yearly" ? "anual" : "mensal";
@@ -144,7 +203,6 @@ export default function LoginPage() {
         return;
       }
 
-      // signup
       if (!fullName.trim()) throw new Error("Informe seu nome.");
       if (!schoolName.trim()) throw new Error("Informe o nome do colégio.");
       if (password.length < 6) throw new Error("A senha deve ter pelo menos 6 caracteres.");
@@ -162,14 +220,13 @@ export default function LoginPage() {
       });
       if (error) throw error;
 
-      // If session exists, redirect to onboarding to finalize DB rows
       if (data.session) {
         router.replace("/onboarding");
         router.refresh();
         return;
       }
 
-      setInfoMsg("Conta criada. Verifique seu e-mail (confirmação) e depois faça login para finalizar o cadastro.");
+      setInfoMsg("Conta criada. Verifique seu e-mail de confirmação e depois entre para finalizar a implantação da escola.");
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Erro inesperado.");
     } finally {
@@ -177,161 +234,279 @@ export default function LoginPage() {
     }
   }
 
+  const heading =
+    mode === "login"
+      ? "Entrar na plataforma"
+      : mode === "signup"
+        ? "Criar conta da escola"
+        : "Recuperar acesso";
+
+  const subheading =
+    mode === "login"
+      ? "Acesse sua operação acadêmica, continue a implantação ou avance para a assinatura."
+      : mode === "signup"
+        ? "Crie o acesso inicial do diretor para configurar a escola, equipe, grade e documentos."
+        : "Informe seu e-mail para receber o link de redefinição de senha.";
+
   return (
-    <div className="page-container py-12">
-      <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
-        <section className="hidden lg:block">
-          <div className="badge w-fit">Organização escolar sem conflitos</div>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            ClassFlow
-          </h1>
-          <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
-            A plataforma com inteligência artificial para organizar horários e montar grades escolares sem conflitos.
-          </p>
+    <div className="page-container py-8 sm:py-10 lg:py-12">
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.9fr]">
+        <section className="panel relative overflow-hidden p-6 sm:p-8 lg:p-10">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-12 top-0 h-40 w-40 rounded-full bg-indigo-500/15 blur-3xl" />
+            <div className="absolute right-0 top-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
+            <div className="absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-pink-500/10 blur-3xl" />
+          </div>
 
-          <ul className="mt-6 grid gap-3">
-            <Feature>Cadastros simples e rápidos</Feature>
-            <Feature>Grade escolar gerada automaticamente</Feature>
-            <Feature>Conflitos identificados e resolvidos com IA</Feature>
-          </ul>
+          <div className="relative">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="badge">Plataforma de gestão acadêmica</div>
+              <div className="badge">IA aplicada à rotina escolar</div>
+            </div>
 
-          <p className="mt-8 text-sm text-zinc-600 dark:text-zinc-400">
-            Dica nerd: Horários bem definidos deixam a IA ainda mais eficiente na montagem da grade.
-          </p>
+            <div className="mt-6 max-w-3xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl dark:text-zinc-100">
+                Entre para operar a escola inteira em um só sistema.
+              </h1>
+              <p className="mt-4 text-base leading-7 text-zinc-700 sm:text-lg dark:text-zinc-300">
+                O ClassFlow conecta cadastro, matriz curricular, grade, Novo Ensino Médio, secretaria,
+                documentos, calendário, relatórios e dashboards da direção em uma única plataforma.
+              </p>
+            </div>
 
-          {/* Planos de assinatura — alinhados à esquerda (desktop) */}
-          <div className="mt-6">
-            <PlanCards onPick={pickPlan} />
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <ValueCard
+                eyebrow="Grade e horários"
+                title="Montagem inteligente com IA"
+                description="Organize a grade semanal, identifique conflitos, ajuste regras docentes e refine a distribuição com apoio da IA."
+              />
+              <ValueCard
+                eyebrow="Conformidade"
+                title="Novo Ensino Médio sob controle"
+                description="Acompanhe FGB, itinerários, coortes, cargas horárias, componentes obrigatórios e alertas de conformidade."
+              />
+              <ValueCard
+                eyebrow="Secretaria"
+                title="Do ingresso à documentação"
+                description="Cadastre estudantes, conduza pré-matrícula assistida, acompanhe históricos e emita documentos escolares."
+              />
+              <ValueCard
+                eyebrow="Direção"
+                title="Gestão com visão executiva"
+                description="Centralize equipe, calendário, parâmetros da escola, relatórios acadêmicos e painéis para tomada de decisão."
+              />
+            </div>
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="panel-inner p-5 sm:p-6">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                  O que você encontra ao entrar
+                </div>
+                <ul className="mt-4 space-y-3">
+                  <Bullet>Assistente de implantação para configurar escola, diretor e parâmetros iniciais</Bullet>
+                  <Bullet>Cadastros completos de turmas, salas, professores, disciplinas e estudantes</Bullet>
+                  <Bullet>Matriz curricular, grade, calendário, relatórios e emissão de documentos</Bullet>
+                  <Bullet>Fluxos específicos para direção, equipe pedagógica e secretaria</Bullet>
+                </ul>
+              </div>
+
+              <div className="panel-inner p-5 sm:p-6">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                  Como começa
+                </div>
+                <div className="mt-4 space-y-4">
+                  <JourneyStep
+                    number="1"
+                    title="Crie ou acesse sua conta"
+                    description="Use o login para continuar sua implantação ou crie o primeiro acesso do diretor da escola."
+                  />
+                  <JourneyStep
+                    number="2"
+                    title="Finalize a implantação"
+                    description="Conclua o onboarding, cadastre a estrutura da escola e configure seus parâmetros acadêmicos."
+                  />
+                  <JourneyStep
+                    number="3"
+                    title="Ative o plano e libere a equipe"
+                    description="Escolha teste, plano mensal ou anual e habilite o uso do sistema para a operação escolar."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <PlanCards onPick={pickPlan} />
+            </div>
           </div>
         </section>
 
-        <section className="panel p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">Painel do diretor</div>
-              <h2 className="text-xl font-semibold tracking-tight">
-                {mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Recuperar senha"}
-              </h2>
-            </div>
-
-            <div className="panel-inner flex items-center gap-1 p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setRedirectAfterLogin("/dashboard");
-                  setInfoMsg(null);
-                  setErrorMsg(null);
-                }}
-                className={
-                  "rounded-xl px-3 py-2 text-sm font-semibold transition " +
-                  (mode === "login"
-                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950"
-                    : "text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-900")
-                }
-              >
-                Entrar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup");
-                  setRedirectAfterLogin("/dashboard");
-                  setInfoMsg(null);
-                  setErrorMsg(null);
-                }}
-                className={
-                  "rounded-xl px-3 py-2 text-sm font-semibold transition " +
-                  (mode === "signup"
-                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950"
-                    : "text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-900")
-                }
-              >
-                Criar
-              </button>
-            </div>
-          </div>
-
-          <form id="auth-form" onSubmit={onSubmit} className="mt-5 grid gap-4">
-            {errorMsg ? <Flash message={errorMsg} variant="error" /> : null}
-            {infoMsg ? <Flash message={infoMsg} variant="success" /> : null}
-
-            {mode === "signup" ? (
-              <div className="grid gap-3">
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Seu nome</span>
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" />
-                </label>
-
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Nome do colégio</span>
-                  <input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="input" />
-                </label>
+        <section className="panel p-5 sm:p-6 lg:p-7">
+          <div className="rounded-[28px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                  Acesso da escola
+                </div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                  {heading}
+                </h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+                  {subheading}
+                </p>
               </div>
-            ) : null}
 
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold">E-mail</span>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" />
-            </label>
+              <div className="panel-inner flex items-center gap-1 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setRedirectAfterLogin("/dashboard");
+                    setInfoMsg(null);
+                    setErrorMsg(null);
+                  }}
+                  className={
+                    "rounded-xl px-3 py-2 text-sm font-semibold transition " +
+                    (mode === "login"
+                      ? "bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-950"
+                      : "text-zinc-700 hover:bg-white/70 dark:text-zinc-200 dark:hover:bg-zinc-900")
+                  }
+                >
+                  Entrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    setRedirectAfterLogin("/dashboard");
+                    setInfoMsg(null);
+                    setErrorMsg(null);
+                  }}
+                  className={
+                    "rounded-xl px-3 py-2 text-sm font-semibold transition " +
+                    (mode === "signup"
+                      ? "bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-950"
+                      : "text-zinc-700 hover:bg-white/70 dark:text-zinc-200 dark:hover:bg-zinc-900")
+                  }
+                >
+                  Criar conta
+                </button>
+              </div>
+            </div>
 
-            {mode !== "forgot" ? (
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+                  Fluxo real
+                </div>
+                <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Onboarding + login + assinatura</div>
+              </div>
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+                  Público
+                </div>
+                <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Direção, coordenação e secretaria</div>
+              </div>
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+                  Entrega
+                </div>
+                <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Gestão acadêmica completa com IA</div>
+              </div>
+            </div>
+
+            <form id="auth-form" onSubmit={onSubmit} className="mt-6 grid gap-4">
+              {errorMsg ? <Flash message={errorMsg} variant="error" /> : null}
+              {infoMsg ? <Flash message={infoMsg} variant="success" /> : null}
+
+              {mode === "signup" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-2 sm:col-span-1">
+                    <span className="text-sm font-semibold">Seu nome</span>
+                    <input
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="input"
+                      placeholder="Nome do diretor responsável"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 sm:col-span-1">
+                    <span className="text-sm font-semibold">Nome do colégio</span>
+                    <input
+                      value={schoolName}
+                      onChange={(e) => setSchoolName(e.target.value)}
+                      className="input"
+                      placeholder="Nome da instituição"
+                    />
+                  </label>
+                </div>
+              ) : null}
+
               <label className="grid gap-2">
-                <span className="text-sm font-semibold">Senha</span>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" />
-              </label>
-            ) : null}
-
-            {mode === "signup" ? (
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold">Confirmar senha</span>
+                <span className="text-sm font-semibold">E-mail</span>
                 <input
-                  type="password"
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="input"
+                  placeholder="seuemail@escola.com.br"
                 />
               </label>
-            ) : null}
 
-            <button disabled={loading} className="btn btn-primary mt-1 w-full">
-              {loading
-                ? "Aguarde..."
-                : mode === "login"
-                  ? "Entrar"
-                  : mode === "signup"
-                    ? "Criar conta"
-                    : "Enviar link"}
-            </button>
+              {mode !== "forgot" ? (
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Senha</span>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input"
+                    placeholder="Digite sua senha"
+                  />
+                </label>
+              ) : null}
 
-            {mode === "login" ? (
-              <button
-                type="button"
-                onClick={() => setMode("forgot")}
-                className="btn btn-ghost w-full"
-              >
-                Esqueci minha senha
+              {mode === "signup" ? (
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Confirmar senha</span>
+                  <input
+                    type="password"
+                    value={password2}
+                    onChange={(e) => setPassword2(e.target.value)}
+                    className="input"
+                    placeholder="Repita a senha criada"
+                  />
+                </label>
+              ) : null}
+
+              <button disabled={loading} className="btn btn-primary mt-1 h-11 w-full text-sm sm:text-base">
+                {loading
+                  ? "Aguarde..."
+                  : mode === "login"
+                    ? "Entrar na plataforma"
+                    : mode === "signup"
+                      ? "Criar conta e iniciar implantação"
+                      : "Enviar link de recuperação"}
               </button>
-            ) : null}
 
-            {mode === "forgot" ? (
-              <button
-                type="button"
-                onClick={() => setMode("login")}
-                className="btn btn-ghost w-full"
-              >
-                Voltar para login
-              </button>
-            ) : null}
+              {mode === "login" ? (
+                <button type="button" onClick={() => setMode("forgot")} className="btn btn-ghost w-full">
+                  Esqueci minha senha
+                </button>
+              ) : null}
 
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              Após criar a conta, finalize o cadastro (colégio) e então o sistema habilita as grades do seu colégio.
-            </p>
-          </form>
+              {mode === "forgot" ? (
+                <button type="button" onClick={() => setMode("login")} className="btn btn-ghost w-full">
+                  Voltar para login
+                </button>
+              ) : null}
 
-          {/* Planos — versão mobile/tablet (a coluna da esquerda não aparece) */}
-          <div className="mt-6 lg:hidden">
-            <PlanCards onPick={pickPlan} />
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4 text-sm leading-6 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-400">
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">Importante:</span> após criar a conta,
+                finalize o cadastro da escola. O sistema usa esse passo para habilitar grade, fluxos acadêmicos,
+                equipe e assinatura do seu ambiente.
+              </div>
+            </form>
           </div>
         </section>
       </div>

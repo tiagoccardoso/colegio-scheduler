@@ -5,14 +5,29 @@ export const metadata = { title: 'Planos' }
 
 const PLANS_LOGIN_URL = 'https://www.classflow.app.br/login'
 
+const platformHighlights = [
+  {
+    title: 'Gestão acadêmica completa',
+    desc: 'Cadastros, matriz curricular, horários, grade, estudantes, documentos e relatórios em um único ambiente.',
+  },
+  {
+    title: 'IA operacional',
+    desc: 'Apoio para parametrização, critérios de professores, montagem de grade, conflitos e leitura de documentos.',
+  },
+  {
+    title: 'Conformidade do NEM',
+    desc: 'Mais visibilidade para FGB, itinerários, trilhas e requisitos curriculares da escola.',
+  },
+]
+
 export default function PlanosPage() {
   return (
     <div>
       <Section className="pt-4">
         <SectionTitle
           kicker="Plano de assinatura"
-          title="Tudo que você precisa para montar a grade — com IA"
-          description="Acesso completo ao gerador de grade, cadastros, detecção e resolução de conflitos e relatórios."
+          title="Tudo que sua escola precisa para operar com mais controle — com IA"
+          description="A assinatura dá acesso à plataforma completa para cadastros, grade, Novo Ensino Médio, jornada do aluno, documentos e relatórios."
         />
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
@@ -23,6 +38,13 @@ export default function PlanosPage() {
             ctaHref={PLANS_LOGIN_URL}
             ctaLabel="Começar teste"
             badge="Comece aqui"
+            features={[
+              'Acesso à plataforma completa',
+              'Fluxos de cadastros e grade com IA',
+              'Conformidade curricular e relatórios',
+              'Pré-matrícula, documentos e histórico',
+              'Calendário e visão para direção',
+            ]}
           />
           <PricingCard
             title="Mensal"
@@ -30,6 +52,13 @@ export default function PlanosPage() {
             note="Renovação automática. Cancele quando quiser."
             ctaHref={PLANS_LOGIN_URL}
             ctaLabel="Assinar mensal"
+            features={[
+              'Gestão acadêmica escolar completa',
+              'IA para setup, grade e conflitos',
+              'Matriz curricular e NEM',
+              'Acompanhamento do aluno',
+              'Documentos e relatórios',
+            ]}
           />
           <PricingCard
             title="Anual"
@@ -38,31 +67,28 @@ export default function PlanosPage() {
             ctaHref={PLANS_LOGIN_URL}
             ctaLabel="Assinar anual"
             highlight
+            features={[
+              'Tudo do plano mensal',
+              'Operação acadêmica contínua',
+              'Mais previsibilidade orçamentária',
+              'Uso da plataforma ao longo do ano letivo',
+              'Ideal para implantação institucional',
+            ]}
           />
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">Cadastros ilimitados</div>
-            <p className="mt-2 text-sm text-zinc-600">Professores, turmas, disciplinas, salas e horários sem limites.</p>
-          </Card>
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">IA para critérios e conflitos</div>
-            <p className="mt-2 text-sm text-zinc-600">
-              A IA interpreta preferências, detecta conflitos e propõe soluções para aplicar em um clique.
-            </p>
-          </Card>
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">Relatórios e auditoria</div>
-            <p className="mt-2 text-sm text-zinc-600">
-              Relatórios para acompanhar decisões, exceções e histórico de alterações na grade.
-            </p>
-          </Card>
+          {platformHighlights.map((item) => (
+            <Card key={item.title}>
+              <div className="text-sm font-semibold text-zinc-900">{item.title}</div>
+              <p className="mt-2 text-sm text-zinc-600">{item.desc}</p>
+            </Card>
+          ))}
         </div>
 
         <p className="mt-10 text-sm text-zinc-600">
           Ao clicar em um plano, você será direcionado para o login do ClassFlow para criar sua conta e concluir a
-          assinatura (ou iniciar o teste grátis).
+          assinatura ou iniciar o teste grátis.
         </p>
       </Section>
     </div>
@@ -75,6 +101,7 @@ function PricingCard(props: {
   note: string
   ctaHref: string
   ctaLabel: string
+  features: string[]
   highlight?: boolean
   badge?: string
 }) {
@@ -92,11 +119,9 @@ function PricingCard(props: {
       </div>
 
       <ul className="mt-6 space-y-2 text-sm text-zinc-600">
-        <li>• Montagem de grade com revisão de conflitos</li>
-        <li>• Critérios do professor interpretados pela IA</li>
-        <li>• Resolver conflitos com sugestões clicáveis</li>
-        <li>• Botão “Aplicar todas” e atualização da grade</li>
-        <li>• Relatórios completos</li>
+        {props.features.map((feature) => (
+          <li key={feature}>• {feature}</li>
+        ))}
       </ul>
 
       <div className="mt-6">

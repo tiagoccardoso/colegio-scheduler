@@ -45,3 +45,130 @@ body {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.training-content {
+  max-width: none;
+  padding: 1.75rem 1.5rem 2rem;
+}
+
+.training-content :where(h2, h3, p, ul, ol, blockquote, hr) {
+  scroll-margin-top: 7rem;
+}
+
+.training-content h2 {
+  margin-top: 3rem;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: rgb(24 24 27);
+}
+
+.training-content h2:first-of-type {
+  margin-top: 0;
+}
+
+.training-content h2:not(:first-of-type) {
+  padding-top: 2rem;
+  border-top: 1px solid rgb(228 228 231);
+}
+
+.training-content h3 {
+  margin-top: 1.75rem;
+  font-size: 1.125rem;
+  line-height: 1.5;
+  font-weight: 700;
+  color: rgb(24 24 27);
+}
+
+.training-content p {
+  margin-top: 1rem;
+  font-size: 1.02rem;
+  line-height: 1.95;
+  color: rgb(82 82 91);
+}
+
+.training-content > h2:first-of-type + p {
+  font-size: 1.125rem;
+  line-height: 1.95;
+  color: rgb(63 63 70);
+}
+
+.training-content strong {
+  color: rgb(24 24 27);
+}
+
+.training-content ul,
+.training-content ol {
+  margin-top: 1.15rem;
+  padding-left: 1.25rem;
+}
+
+.training-content li {
+  margin-top: 0.8rem;
+  padding-left: 0.35rem;
+  font-size: 1rem;
+  line-height: 1.85;
+  color: rgb(82 82 91);
+}
+
+.training-content ul li::marker,
+.training-content ol li::marker {
+  color: rgb(var(--brand-700));
+  font-weight: 700;
+}
+
+.training-content blockquote {
+  margin-top: 1.5rem;
+  border-left: 4px solid rgb(var(--brand-500));
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.09), rgba(255, 255, 255, 0.9));
+  padding: 1rem 1.15rem;
+}
+
+.training-content hr {
+  margin: 2rem 0;
+  border-color: rgb(228 228 231);
+}
+
+.training-content a {
+  color: rgb(var(--brand-700));
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.training-anchor-link {
+  display: block;
+  border-radius: 1rem;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgb(82 82 91);
+  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.training-anchor-link:hover {
+  background: rgba(16, 185, 129, 0.08);
+  color: rgb(24 24 27);
+  transform: translateX(2px);
+}
+
+.training-anchor-link-sub {
+  margin-left: 0.85rem;
+  font-size: 0.9rem;
+}
+
+@media (min-width: 640px) {
+  .training-content {
+    padding: 2.25rem 2rem 2.5rem;
+  }
+
+  .training-content h2 {
+    font-size: 1.95rem;
+  }
+
+  .training-content p,
+  .training-content li {
+    font-size: 1.05rem;
+  }
+}

@@ -51,7 +51,7 @@ export function LiveDemoRequest() {
     <Card className="p-6">
       <div className="text-sm font-semibold text-zinc-900">Solicitar demonstração ao vivo</div>
       <p className="mt-2 text-sm text-zinc-600">
-        Preencha os campos abaixo e clique para enviar pelo WhatsApp ou e-mail (a mensagem já vai montada).
+        Preencha os campos e envie a mensagem já montada por WhatsApp ou e-mail para agendar uma apresentação focada no seu cenário escolar.
       </p>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -101,7 +101,7 @@ export function LiveDemoRequest() {
             className="min-h-[110px] rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900 shadow-soft focus:outline-none focus:ring-2 focus:ring-brand-200"
             value={mensagem}
             onChange={(e) => setMensagem(e.target.value)}
-            placeholder="Ex.: Queremos ver o fluxo de cadastros + montagem de grade com IA e relatórios."
+            placeholder="Ex.: Queremos ver o fluxo de cadastros, matriz curricular, grade com IA, NEM e documentos do aluno."
           />
         </label>
       </div>

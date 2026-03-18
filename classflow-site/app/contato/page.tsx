@@ -10,15 +10,15 @@ export default function ContatoPage() {
       <Section className="pt-4">
         <SectionTitle
           kicker="Contato"
-          title="Vamos organizar seus horários?"
-          description="Peça demonstração, treinamento ou ajuda para implantação. Resposta rápida em horário comercial."
+          title="Vamos apresentar o fluxo completo da sua escola?"
+          description="Peça uma demonstração, treinamento ou apoio para implantação. Resposta rápida em horário comercial."
         />
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <Card>
             <div className="text-sm font-semibold text-zinc-900">E-mail</div>
             <p className="mt-2 text-sm text-zinc-600">
-              Envie sua mensagem com nome da escola, município, turno e quantidade aproximada de turmas.
+              Envie sua mensagem com nome da escola, município, quantidade aproximada de turmas e os módulos que você quer ver na demonstração.
             </p>
             <div className="mt-4">
               <a className="text-sm font-semibold text-brand-700 hover:underline" href={`mailto:${CONTACT_EMAIL}`}>
@@ -30,7 +30,7 @@ export default function ContatoPage() {
           <Card>
             <div className="text-sm font-semibold text-zinc-900">Telefone / WhatsApp</div>
             <p className="mt-2 text-sm text-zinc-600">
-              Ligue ou mande uma mensagem no WhatsApp e a gente agenda uma demonstração.
+              Ligue ou mande uma mensagem para agendar uma apresentação do fluxo de cadastros, grade, NEM, alunos e documentos.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold">
               <a className="text-brand-700 hover:underline" href={CONTACT_TEL_URL}>
@@ -51,7 +51,7 @@ export default function ContatoPage() {
         <div className="mt-8 rounded-2xl border border-brand-100 bg-brand-50 p-6">
           <div className="text-sm font-semibold text-zinc-900">Sugestão de mensagem</div>
           <p className="mt-2 text-sm text-zinc-700">
-            “Olá! Quero uma demonstração do ClassFlow. Somos uma escola com X turmas no turno Y. Precisamos organizar a grade e reduzir conflitos. Podemos agendar?”
+            “Olá! Quero uma demonstração do ClassFlow. Somos uma escola com X turmas e queremos conhecer os fluxos de cadastros, matriz curricular, grade com IA, Novo Ensino Médio, acompanhamento do aluno e documentos. Podemos agendar?”
           </p>
         </div>
 

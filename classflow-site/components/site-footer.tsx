@@ -12,7 +12,7 @@ export function SiteFooter() {
           <div>
             <div className="text-sm font-semibold text-zinc-900">ClassFlow</div>
             <p className="mt-2 text-sm text-zinc-600">
-              A inteligência artificial auxilia na organização das regras da escola e monta automaticamente uma grade de horários sem conflitos.
+              Plataforma de gestão acadêmica com IA para organizar cadastros, matriz curricular, grade, Novo Ensino Médio, jornada do aluno e documentos escolares.
             </p>
           </div>
 
@@ -38,7 +38,7 @@ export function SiteFooter() {
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contato</div>
             <p className="mt-3 text-sm text-zinc-600">
-              Para demonstração, implantação e dúvidas.
+              Para demonstração, implantação, treinamentos e dúvidas sobre a plataforma.
             </p>
             <div className="mt-3 space-y-2 text-sm">
               <p className="text-zinc-700">

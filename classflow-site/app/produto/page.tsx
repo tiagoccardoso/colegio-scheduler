@@ -4,69 +4,140 @@ import { APP_URL } from '@/lib/app-url'
 
 export const metadata = { title: 'Produto' }
 
+const coreModules = [
+  {
+    title: 'Base institucional e acessos',
+    description:
+      'Onboarding da escola, perfil do diretor, equipe pedagógica, permissões por perfil e assinatura para operação contínua.',
+    bullets: ['Direção e equipe pedagógica', 'Perfis e controle de acesso', 'Fluxo pronto para implantação'],
+  },
+  {
+    title: 'Cadastros acadêmicos completos',
+    description:
+      'Professores, estudantes, turmas, salas, disciplinas, horários e regras curriculares estruturados para alimentar toda a operação.',
+    bullets: ['Cadastros de base escolar', 'Regras por turma, sala e turno', 'Informações pedagógicas e operacionais'],
+  },
+  {
+    title: 'Matriz curricular e grade',
+    description:
+      'A matriz orienta a montagem da grade semanal com regras por componente, distribuição de aulas, edição manual e revisão de conflitos.',
+    bullets: ['Matriz por turma e coorte', 'Grade automática e manual', 'Relatórios por turma, professor e sala'],
+  },
+  {
+    title: 'Novo Ensino Médio',
+    description:
+      'Parâmetros curriculares, FGB, itinerários, trilhas, educação digital, Projeto de Vida e alertas para apoiar a conformidade da escola.',
+    bullets: ['Validação por turma e ano', 'Acompanhamento de carga horária', 'Painéis e relatórios do NEM'],
+  },
+  {
+    title: 'Jornada do aluno',
+    description:
+      'Pré-matrícula, matrícula, acompanhamento, frequência, avaliações, permanência, histórico escolar e trilhas técnicas em um só ambiente.',
+    bullets: ['Pré-matrícula com documentos', 'Acompanhamento pedagógico', 'Históricos e certificações'],
+  },
+  {
+    title: 'Documentos e calendário escolar',
+    description:
+      'Emissão de documentos escolares, rastreabilidade de segundas vias, calendário do diretor e importação de eventos a partir de fontes e PDFs.',
+    bullets: ['Declarações e histórico escolar', 'Calendário institucional', 'Fluxo para secretaria e direção'],
+  },
+]
+
+const aiModules = [
+  {
+    title: 'IA no setup da escola',
+    desc: 'Ajuda a estruturar parâmetros iniciais da operação com base em texto e áudio, acelerando a configuração do ambiente.',
+  },
+  {
+    title: 'IA para grade e conflitos',
+    desc: 'Sugere horários, resolve conflitos, aplica heurísticas e apoia decisões sem tirar o controle da equipe escolar.',
+  },
+  {
+    title: 'IA para critérios do professor',
+    desc: 'Interpreta linguagem natural, monta proposta de disponibilidade e salva regras operacionais para a grade.',
+  },
+  {
+    title: 'IA para documentos da pré-matrícula',
+    desc: 'Lê PDFs e imagens, classifica arquivos e propõe dados de cadastro para revisão antes da conversão em matrícula.',
+  },
+]
+
+const stakeholders = [
+  {
+    title: 'Para a direção',
+    desc: 'Mais visibilidade sobre conformidade curricular, permanência, calendário, equipe e relatórios executivos.',
+  },
+  {
+    title: 'Para a coordenação pedagógica',
+    desc: 'Mais controle sobre matriz curricular, grade, carga horária, conflitos e ajustes de rotina.',
+  },
+  {
+    title: 'Para a secretaria',
+    desc: 'Mais agilidade na matrícula, documentos, históricos e organização da base escolar.',
+  },
+]
+
 export default function ProdutoPage() {
   return (
     <div>
       <Section className="pt-4">
         <SectionTitle
           kicker="Produto"
-          title="Da regra ao horário: a IA auxilia do começo ao fim"
-          description="Cadastros simples, geração de grade do turno, detecção de conflitos e resolução com sugestões clicáveis."
+          title="Uma plataforma para a operação acadêmica da escola"
+          description="O ClassFlow conecta gestão de cadastros, matriz curricular, grade, Novo Ensino Médio, jornada do aluno, documentos e automações com IA."
         />
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">1) Cadastros essenciais</div>
-            <p className="mt-2 text-sm text-zinc-600">
-              Disciplinas, salas, turmas, horários e professores. Tudo organizado para alimentar o motor de grade.
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-zinc-600">
-              <li>• Cadastros ilimitados</li>
-              <li>• Consistência de horários (início/fim)</li>
-              <li>• Relatórios prontos</li>
-            </ul>
-          </Card>
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {coreModules.map((module) => (
+            <Card key={module.title}>
+              <div className="text-sm font-semibold text-zinc-900">{module.title}</div>
+              <p className="mt-2 text-sm text-zinc-600">{module.description}</p>
+              <ul className="mt-4 space-y-2 text-sm text-zinc-600">
+                {module.bullets.map((bullet) => (
+                  <li key={bullet}>• {bullet}</li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+      </Section>
 
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">2) Critérios do professor</div>
-            <p className="mt-2 text-sm text-zinc-600">
-              Escreva em linguagem natural: dias disponíveis, períodos, turmas e carga horária. A IA interpreta e propõe horários.
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-zinc-600">
-              <li>• Ex.: “Seg/ter/qua de manhã, últimos períodos”</li>
-              <li>• Sugestões com explicação</li>
-              <li>• Edição manual antes de salvar</li>
-            </ul>
-          </Card>
+      <Section className="pt-0">
+        <SectionTitle
+          kicker="IA aplicada"
+          title="Automação prática para reduzir trabalho manual"
+          description="A IA aparece em tarefas operacionais do dia a dia, não apenas como apoio visual. O objetivo é acelerar configuração, ajustes e conferências."
+        />
 
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">3) Montagem de grade do turno</div>
-            <p className="mt-2 text-sm text-zinc-600">
-              Monte a grade geral e revise conflitos (professor, turma ou sala). Visualize por dia e aplique ajustes.
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-zinc-600">
-              <li>• Detecção automática de conflitos</li>
-              <li>• Relatórios por turma/professor/sala</li>
-              <li>• Exportação para impressão</li>
-            </ul>
-          </Card>
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {aiModules.map((module) => (
+            <Card key={module.title}>
+              <div className="text-sm font-semibold text-zinc-900">{module.title}</div>
+              <p className="mt-2 text-sm text-zinc-600">{module.desc}</p>
+            </Card>
+          ))}
+        </div>
+      </Section>
 
-          <Card>
-            <div className="text-sm font-semibold text-zinc-900">4) Resolver conflitos com IA</div>
-            <p className="mt-2 text-sm text-zinc-600">
-              Quando aparecer conflito, clique em <span className="font-semibold">Resolver com IA</span>. Veja sugestões em pt-BR e aplique.
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-zinc-600">
-              <li>• Sugestões clicáveis</li>
-              <li>• Botão “Aplicar todas”</li>
-              <li>• Atualiza cadastro, grade e relatórios</li>
-            </ul>
-          </Card>
+      <Section className="pt-0">
+        <SectionTitle
+          kicker="Quem mais ganha com isso"
+          title="Fluxos pensados para direção, coordenação e secretaria"
+          description="A plataforma atende áreas diferentes da escola com um mesmo conjunto de dados e relatórios."
+        />
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {stakeholders.map((item) => (
+            <Card key={item.title}>
+              <div className="text-sm font-semibold text-zinc-900">{item.title}</div>
+              <p className="mt-2 text-sm text-zinc-600">{item.desc}</p>
+            </Card>
+          ))}
         </div>
 
         <div className="mt-10 flex flex-wrap gap-3">
           <PrimaryButton href="/planos">Ver planos</PrimaryButton>
-          <SecondaryButton href="/treinamentos">Ver treinamentos</SecondaryButton>
+          <SecondaryButton href="/contato">Pedir demonstração</SecondaryButton>
           <a
             href={APP_URL}
             className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"

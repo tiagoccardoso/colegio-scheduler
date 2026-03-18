@@ -29,7 +29,7 @@ export function SiteHeader() {
           </span>
           <div className="leading-tight">
             <div className="text-sm font-semibold tracking-tight text-zinc-900">ClassFlow</div>
-            <div className="text-xs text-zinc-500">IA para horários sem conflitos</div>
+            <div className="text-xs text-zinc-500">Gestão acadêmica com IA</div>
           </div>
         </Link>
 
@@ -59,10 +59,10 @@ export function SiteHeader() {
             Acessar sistema
           </a>
           <Link
-            href="/planos"
+            href="/contato"
             className="inline-flex h-10 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-soft hover:bg-brand-700"
           >
-            Assinar
+            Agendar demo
           </Link>
         </div>
       </div>
