@@ -80,7 +80,7 @@ export function NavLinks(
             type="button"
             onClick={goBilling}
             title="Bloqueado até concluir a assinatura"
-            className={"nav-pill opacity-40 hover:opacity-60"}
+            className={"nav-pill opacity-55 hover:opacity-80"}
           >
             <LockIcon className="h-4 w-4" />
             {label}
@@ -89,8 +89,7 @@ export function NavLinks(
       }
 
       return (
-        <Link key={href} href={href} className={"nav-pill " + (active ? "nav-pill-active" : "")}
-        >
+        <Link key={href} href={href} className={"nav-pill " + (active ? "nav-pill-active" : "")}>
           {label}
         </Link>
       );
@@ -104,8 +103,7 @@ export function NavLinks(
           onClick={goBilling}
           title="Bloqueado até concluir a assinatura"
           className={
-            "flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold transition opacity-40 hover:opacity-60 " +
-            "text-zinc-700 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-950/60"
+            "flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition opacity-55 hover:bg-zinc-50 hover:opacity-80 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
           }
         >
           <LockIcon className="h-4 w-4" />
@@ -119,10 +117,10 @@ export function NavLinks(
         key={href}
         href={href}
         className={
-          "rounded-2xl px-3 py-2 text-sm font-semibold transition " +
+          "rounded-2xl border px-3 py-2 text-sm font-semibold shadow-sm transition " +
           (active
-            ? "bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-950"
-            : "text-zinc-700 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-950/60")
+            ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-950"
+            : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900")
         }
       >
         {label}
@@ -142,8 +140,7 @@ export function NavLinks(
           onClick={goBilling}
           title="Bloqueado até concluir a assinatura"
           className={
-            "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition opacity-40 hover:opacity-60 " +
-            "text-zinc-700 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-900"
+            "flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm font-semibold text-zinc-700 shadow-sm transition opacity-55 hover:bg-zinc-50 hover:opacity-80 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
           }
         >
           <LockIcon className="h-4 w-4" />
@@ -157,10 +154,10 @@ export function NavLinks(
         key={href}
         href={href}
         className={
-          "block rounded-xl px-3 py-2 text-sm font-semibold transition " +
+          "block rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition " +
           (active
-            ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950"
-            : "text-zinc-700 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-900")
+            ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-950"
+            : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900")
         }
       >
         {label}
@@ -179,7 +176,7 @@ export function NavLinks(
                 <summary
                   className={
                     "nav-pill list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden " +
-                    (sectionLocked ? "opacity-40 hover:opacity-60" : "")
+                    (sectionLocked ? "opacity-55 hover:opacity-80" : "")
                   }
                   title={sectionLocked ? "Bloqueado até concluir a assinatura" : undefined}
                 >
@@ -196,7 +193,7 @@ export function NavLinks(
                   </span>
                 </summary>
 
-                <div className="absolute left-0 z-20 mt-2 min-w-[240px] panel p-1">
+                <div className="absolute left-0 z-20 mt-2 min-w-[260px] rounded-3xl border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
                   {section.items.map((l) => (
                     <DropdownLinkItem key={l.href} href={l.href} label={l.label} />
                   ))}

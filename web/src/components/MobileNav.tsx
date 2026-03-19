@@ -1,32 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { NavLinks } from "@/components/NavLinks";
-import { LogoutButton } from "@/components/LogoutButton";
 import { HelpIconLink } from "@/components/HelpIconLink";
-import type { NavSection } from "@/components/nav";
+import { LogoutButton } from "@/components/LogoutButton";
+import { NavLinks } from "@/components/NavLinks";
+import { type NavSection } from "@/components/nav";
 
 function MenuIcon() {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-5 w-5">
-      <path d="M3 5h14a1 1 0 1 0 0-2H3a1 1 0 1 0 0 2Zm14 4H3a1 1 0 0 0 0 2h14a1 1 0 1 0 0-2Zm0 6H3a1 1 0 0 0 0 2h14a1 1 0 1 0 0-2Z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="h-5 w-5">
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
     </svg>
   );
 }
 
 function XIcon() {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-5 w-5">
-      <path d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="h-5 w-5">
+      <path d="M6 6l12 12" />
+      <path d="M18 6l-12 12" />
     </svg>
   );
 }
 
-export function MobileNav(
-  props: { homeHref?: string; sections?: NavSection[]; isSubscribed?: boolean } = {},
-) {
+export function MobileNav(props: { homeHref?: string; sections?: NavSection[]; isSubscribed?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const homeHref = props.homeHref ?? "/dashboard";
@@ -57,7 +58,7 @@ export function MobileNav(
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="absolute left-0 top-0 h-full w-[88%] max-w-[360px] overflow-y-auto rounded-r-3xl border-r border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
+          <div className="absolute left-0 top-0 h-full w-[88%] max-w-[360px] overflow-y-auto rounded-r-3xl border-r border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
             <div className="flex items-center justify-between">
               <Link href={homeHref} className="text-sm font-semibold tracking-tight">
                 Colégio Scheduler
@@ -68,7 +69,7 @@ export function MobileNav(
               </div>
             </div>
 
-            <div className="mt-4 panel p-2">
+            <div className="mt-4 panel-solid p-2">
               <NavLinks variant="sidebar" sections={props.sections} isSubscribed={props.isSubscribed} />
             </div>
 

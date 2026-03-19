@@ -147,14 +147,14 @@ body {
 
   /* nav pills */
   .nav-pill {
-    @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-[15px] font-semibold transition;
-    @apply text-zinc-700 hover:bg-white/60 hover:text-zinc-900;
-    @apply dark:text-zinc-200 dark:hover:bg-zinc-950/60 dark:hover:text-white;
+    @apply inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-[15px] font-semibold text-zinc-700 shadow-sm transition;
+    @apply hover:bg-zinc-50 hover:text-zinc-900;
+    @apply dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900 dark:hover:text-white;
   }
 
   .nav-pill-active {
-    @apply bg-zinc-900 text-white shadow-sm;
-    @apply dark:bg-white dark:text-zinc-950;
+    @apply border-zinc-900 bg-zinc-900 text-white shadow-sm;
+    @apply dark:border-white dark:bg-white dark:text-zinc-950;
   }
 
   /* tables */

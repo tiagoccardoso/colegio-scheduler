@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "Colégio Scheduler",
-  description: "Painel do diretor e app do professor",
+  title: "ClassFlow",
+  description: "Gestão acadêmica escolar com IA",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
