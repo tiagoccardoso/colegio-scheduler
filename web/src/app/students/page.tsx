@@ -41,6 +41,7 @@ function boolValue(value: boolean | null | undefined) {
 type StudentRow = {
   id: string;
   registration_number: string | null;
+  cgm: string | null;
   full_name: string | null;
   social_name: string | null;
   birth_date: string | null;
@@ -214,6 +215,10 @@ function StudentFormFields({
           <label className="grid gap-2">
             <span className="text-sm font-semibold">Matrícula interna</span>
             <input name="registration_number" type="text" defaultValue={inputValue(student?.registration_number)} className="input" />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold">CGM (Código Geral de Matrícula)</span>
+            <input name="cgm" type="text" defaultValue={inputValue(student?.cgm)} className="input" />
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-semibold">Nome social</span>
@@ -563,6 +568,7 @@ function StudentSummary({ student }: { student: StudentRow }) {
     <div className="grid gap-1 text-sm">
       <div className="font-semibold">{student.full_name ?? "—"}</div>
       <div className="text-zinc-500 dark:text-zinc-400">Matrícula: {student.registration_number || "—"}</div>
+      <div className="text-zinc-500 dark:text-zinc-400">CGM: {student.cgm || "—"}</div>
       <div className="text-zinc-500 dark:text-zinc-400">CPF: {student.cpf || "—"}</div>
       <div className="text-zinc-500 dark:text-zinc-400">Nascimento: {formatDateBR(student.birth_date)}</div>
       <div className="text-zinc-500 dark:text-zinc-400">Contato principal: {student.guardian_name || "—"}</div>
@@ -574,6 +580,7 @@ function buildStudentPayload(formData: FormData, profileSchoolId: string) {
   return {
     school_id: profileSchoolId,
     registration_number: cleanNullable(formData.get("registration_number")),
+    cgm: cleanNullable(formData.get("cgm")),
     full_name: cleanNullable(formData.get("full_name")),
     social_name: cleanNullable(formData.get("social_name")),
     birth_date: cleanNullable(formData.get("birth_date")),
@@ -660,7 +667,7 @@ export default async function StudentsPage({
     supabase
       .from("students")
       .select(
-        "id, registration_number, full_name, social_name, birth_date, status, guardian_name, guardian_phone, notes, cpf, rg, rg_issuer, rg_state, birth_certificate_number, nationality, naturalness_city, naturalness_state, sex, gender_identity, race_color, email, phone, mobile_phone, zip_code, street, street_number, address_complement, neighborhood, city, state_code, mother_name, father_name, nis_number, sus_card_number, blood_type, allergy_notes, health_notes, medication_notes, has_disability, disability_details, has_aee, uses_school_transport, social_program_notes, school_origin_name, school_origin_network, school_origin_city, school_origin_state, previous_school_year, previous_grade, transfer_type, transfer_date, created_at",
+        "id, registration_number, cgm, full_name, social_name, birth_date, status, guardian_name, guardian_phone, notes, cpf, rg, rg_issuer, rg_state, birth_certificate_number, nationality, naturalness_city, naturalness_state, sex, gender_identity, race_color, email, phone, mobile_phone, zip_code, street, street_number, address_complement, neighborhood, city, state_code, mother_name, father_name, nis_number, sus_card_number, blood_type, allergy_notes, health_notes, medication_notes, has_disability, disability_details, has_aee, uses_school_transport, social_program_notes, school_origin_name, school_origin_network, school_origin_city, school_origin_state, previous_school_year, previous_grade, transfer_type, transfer_date, created_at",
       )
       .eq("school_id", profile.school_id)
       .order("full_name", { ascending: true }),

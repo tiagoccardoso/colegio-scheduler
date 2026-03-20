@@ -1,5 +1,6 @@
--- Matrículas públicas vindas do site institucional
--- Tabela temporária para revisão interna, aprovação e conversão em estudante + matrícula.
+-- Tabela temporária para solicitações públicas de matrícula vindas do site.
+-- Este patch já contempla os campos novos do formulário, incluindo endereço,
+-- idade calculada e regra de maioridade (responsável opcional para 18+).
 
 create table if not exists public.public_enrollment_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -10,9 +11,18 @@ create table if not exists public.public_enrollment_submissions (
   student_cpf text null,
   student_email text null,
   student_phone text null,
-  guardian_name text not null,
-  guardian_email text not null,
-  guardian_phone text not null,
+  student_zip_code text null,
+  student_address_line1 text null,
+  student_address_number text null,
+  student_address_line2 text null,
+  student_neighborhood text null,
+  student_city text null,
+  student_state text null,
+  student_age integer null,
+  is_adult_student boolean null,
+  guardian_name text null,
+  guardian_email text null,
+  guardian_phone text null,
   desired_grade text not null,
   shift_preference text null,
   previous_school text null,
@@ -29,6 +39,41 @@ create table if not exists public.public_enrollment_submissions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Compatibilidade para bancos que já têm a tabela criada com estrutura antiga.
+alter table if exists public.public_enrollment_submissions
+  add column if not exists student_zip_code text null,
+  add column if not exists student_address_line1 text null,
+  add column if not exists student_address_number text null,
+  add column if not exists student_address_line2 text null,
+  add column if not exists student_neighborhood text null,
+  add column if not exists student_city text null,
+  add column if not exists student_state text null,
+  add column if not exists student_age integer null,
+  add column if not exists is_adult_student boolean null,
+  add column if not exists decision_notes text null,
+  add column if not exists approved_by uuid null,
+  add column if not exists approved_at timestamptz null,
+  add column if not exists converted_student_id uuid null,
+  add column if not exists converted_enrollment_id uuid null,
+  add column if not exists submitted_at timestamptz null,
+  add column if not exists created_at timestamptz null,
+  add column if not exists updated_at timestamptz null;
+
+-- Responsável passa a ser opcional quando o estudante é maior de 18 anos.
+alter table if exists public.public_enrollment_submissions
+  alter column guardian_name drop not null,
+  alter column guardian_email drop not null,
+  alter column guardian_phone drop not null;
+
+-- Garante defaults importantes mesmo em bases antigas.
+alter table if exists public.public_enrollment_submissions
+  alter column status set default 'PENDENTE',
+  alter column source set default 'SITE_PUBLICO',
+  alter column payload set default '{}'::jsonb,
+  alter column submitted_at set default now(),
+  alter column created_at set default now(),
+  alter column updated_at set default now();
 
 create index if not exists public_enrollment_submissions_school_idx
   on public.public_enrollment_submissions (school_id, status, submitted_at desc);
