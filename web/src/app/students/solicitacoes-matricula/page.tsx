@@ -120,6 +120,22 @@ function formatDateBR(value: string | null | undefined) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: value.includes("T") ? "short" : undefined }).format(date);
 }
 
+function calculateAge(birthDate: string | null | undefined) {
+  if (!birthDate) return null;
+  const date = new Date(birthDate);
+  if (Number.isNaN(date.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  const monthDiff = today.getMonth() - date.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+function isAdultBirthDate(birthDate: string | null | undefined) {
+  const age = calculateAge(birthDate);
+  return age != null && age >= 18;
+}
+
 function classLabel(row: ClassRow | null | undefined) {
   if (!row) return "Sem turma";
   const shift = String(row.shift ?? "").trim();
@@ -134,25 +150,49 @@ function fieldFromSubmission<T extends keyof SubmissionRow>(submission: Submissi
   return value == null || String(value).trim() === "" ? null : value;
 }
 
+function payloadValue(submission: SubmissionRow, ...paths: string[]) {
+  const payload = (submission.payload ?? {}) as Record<string, any>;
+  for (const path of paths) {
+    const parts = path.split('.');
+    let current: any = payload;
+    for (const part of parts) {
+      if (current == null || typeof current !== 'object' || !(part in current)) {
+        current = null;
+        break;
+      }
+      current = current[part];
+    }
+    if (current != null && String(current).trim() !== '') return current;
+  }
+  return null;
+}
+
 function asDraft(submission: SubmissionRow): Draft {
   const enrollmentPayload = ((submission.payload ?? {}).enrollment ?? {}) as Record<string, any>;
   return {
     student: {
-      full_name: String(fieldFromSubmission(submission, "student_name") ?? "").trim() || null,
-      birth_date: String(fieldFromSubmission(submission, "student_birth_date") ?? "").trim() || null,
-      cpf: String(fieldFromSubmission(submission, "student_cpf") ?? "").trim() || null,
-      email: String(fieldFromSubmission(submission, "student_email") ?? "").trim() || null,
-      mobile_phone: String(fieldFromSubmission(submission, "student_phone") ?? "").trim() || null,
-      phone: String(fieldFromSubmission(submission, "student_phone") ?? "").trim() || null,
-      school_origin_name: String(fieldFromSubmission(submission, "previous_school") ?? "").trim() || null,
-      previous_grade: String(fieldFromSubmission(submission, "desired_grade") ?? "").trim() || null,
+      full_name: String(fieldFromSubmission(submission, "student_name") ?? payloadValue(submission, "student.full_name") ?? "").trim() || null,
+      birth_date: String(fieldFromSubmission(submission, "student_birth_date") ?? payloadValue(submission, "student.birth_date") ?? "").trim() || null,
+      cpf: String(fieldFromSubmission(submission, "student_cpf") ?? payloadValue(submission, "student.cpf") ?? "").trim() || null,
+      email: String(fieldFromSubmission(submission, "student_email") ?? payloadValue(submission, "student.email") ?? "").trim() || null,
+      mobile_phone: String(fieldFromSubmission(submission, "student_phone") ?? payloadValue(submission, "student.mobile_phone", "student.phone") ?? "").trim() || null,
+      phone: String(fieldFromSubmission(submission, "student_phone") ?? payloadValue(submission, "student.phone", "student.mobile_phone") ?? "").trim() || null,
+      zip_code: String(payloadValue(submission, "student.zip_code", "address.zip_code", "zip_code") ?? "").trim() || null,
+      street: String(payloadValue(submission, "student.street", "address.street", "street") ?? "").trim() || null,
+      street_number: String(payloadValue(submission, "student.street_number", "address.street_number", "street_number") ?? "").trim() || null,
+      address_complement: String(payloadValue(submission, "student.address_complement", "address.address_complement", "address_complement") ?? "").trim() || null,
+      neighborhood: String(payloadValue(submission, "student.neighborhood", "address.neighborhood", "neighborhood") ?? "").trim() || null,
+      city: String(payloadValue(submission, "student.city", "address.city", "city") ?? "").trim() || null,
+      state_code: String(payloadValue(submission, "student.state_code", "address.state_code", "state_code") ?? "").trim() || null,
+      school_origin_name: String(fieldFromSubmission(submission, "previous_school") ?? payloadValue(submission, "student.school_origin_name") ?? "").trim() || null,
+      previous_grade: String(fieldFromSubmission(submission, "desired_grade") ?? payloadValue(submission, "student.previous_grade") ?? "").trim() || null,
     },
     guardians: [
       {
-        full_name: String(fieldFromSubmission(submission, "guardian_name") ?? "").trim() || null,
-        email: String(fieldFromSubmission(submission, "guardian_email") ?? "").trim() || null,
-        mobile_phone: String(fieldFromSubmission(submission, "guardian_phone") ?? "").trim() || null,
-        phone: String(fieldFromSubmission(submission, "guardian_phone") ?? "").trim() || null,
+        full_name: String(fieldFromSubmission(submission, "guardian_name") ?? payloadValue(submission, "guardian.full_name", "guardians.0.full_name") ?? "").trim() || null,
+        email: String(fieldFromSubmission(submission, "guardian_email") ?? payloadValue(submission, "guardian.email", "guardians.0.email") ?? "").trim() || null,
+        mobile_phone: String(fieldFromSubmission(submission, "guardian_phone") ?? payloadValue(submission, "guardian.mobile_phone", "guardians.0.mobile_phone", "guardian.phone", "guardians.0.phone") ?? "").trim() || null,
+        phone: String(fieldFromSubmission(submission, "guardian_phone") ?? payloadValue(submission, "guardian.phone", "guardians.0.phone", "guardian.mobile_phone", "guardians.0.mobile_phone") ?? "").trim() || null,
         relationship: "RESPONSÁVEL",
         is_legal_guardian: true,
         is_financial_guardian: true,
@@ -190,6 +230,13 @@ function buildDraftFromForm(formData: FormData, submission: SubmissionRow): Draf
       email: cleanText(formData.get("student_email")),
       mobile_phone: cleanText(formData.get("student_phone")),
       phone: cleanText(formData.get("student_phone")),
+      zip_code: cleanDigits(formData.get("zip_code")),
+      street: cleanText(formData.get("street")),
+      street_number: cleanText(formData.get("street_number")),
+      address_complement: cleanText(formData.get("address_complement")),
+      neighborhood: cleanText(formData.get("neighborhood")),
+      city: cleanText(formData.get("city")),
+      state_code: cleanUpper(formData.get("state_code")),
       school_origin_name: cleanText(formData.get("previous_school")),
       previous_grade: cleanText(formData.get("desired_grade")),
     },
@@ -234,6 +281,13 @@ function submissionUpdatePayload(submission: SubmissionRow, draft: Draft, userId
     student_cpf: draft.student.cpf ?? null,
     student_email: draft.student.email ?? null,
     student_phone: draft.student.mobile_phone ?? draft.student.phone ?? null,
+    zip_code: draft.student.zip_code ?? null,
+    street: draft.student.street ?? null,
+    street_number: draft.student.street_number ?? null,
+    address_complement: draft.student.address_complement ?? null,
+    neighborhood: draft.student.neighborhood ?? null,
+    city: draft.student.city ?? null,
+    state_code: draft.student.state_code ?? null,
     guardian_name: draft.guardians[0]?.full_name ?? null,
     guardian_email: draft.guardians[0]?.email ?? null,
     guardian_phone: draft.guardians[0]?.mobile_phone ?? draft.guardians[0]?.phone ?? null,
@@ -254,6 +308,30 @@ function submissionUpdatePayload(submission: SubmissionRow, draft: Draft, userId
       student_cpf: draft.student.cpf ?? null,
       student_email: draft.student.email ?? null,
       student_phone: draft.student.mobile_phone ?? draft.student.phone ?? null,
+      zip_code: draft.student.zip_code ?? null,
+      street: draft.student.street ?? null,
+      street_number: draft.student.street_number ?? null,
+      address_complement: draft.student.address_complement ?? null,
+      neighborhood: draft.student.neighborhood ?? null,
+      city: draft.student.city ?? null,
+      state_code: draft.student.state_code ?? null,
+      student: {
+        full_name: draft.student.full_name ?? null,
+        birth_date: draft.student.birth_date ?? null,
+        cpf: draft.student.cpf ?? null,
+        email: draft.student.email ?? null,
+        mobile_phone: draft.student.mobile_phone ?? draft.student.phone ?? null,
+        phone: draft.student.phone ?? draft.student.mobile_phone ?? null,
+        zip_code: draft.student.zip_code ?? null,
+        street: draft.student.street ?? null,
+        street_number: draft.student.street_number ?? null,
+        address_complement: draft.student.address_complement ?? null,
+        neighborhood: draft.student.neighborhood ?? null,
+        city: draft.student.city ?? null,
+        state_code: draft.student.state_code ?? null,
+        school_origin_name: draft.student.school_origin_name ?? null,
+        previous_grade: draft.student.previous_grade ?? null,
+      },
       guardian_name: draft.guardians[0]?.full_name ?? null,
       guardian_email: draft.guardians[0]?.email ?? null,
       guardian_phone: draft.guardians[0]?.mobile_phone ?? draft.guardians[0]?.phone ?? null,
@@ -335,6 +413,21 @@ export default async function SolicitacoesMatriculaPage({
     if (error) redirect("/students/solicitacoes-matricula?error=" + encodeMsg(error.message));
     revalidatePath("/students/solicitacoes-matricula");
     redirect("/students/solicitacoes-matricula?msg=" + encodeMsg("Solicitação marcada como rejeitada."));
+  }
+
+  async function deleteAction(formData: FormData) {
+    "use server";
+    const { supabase, profile } = await requireStaff();
+    const submissionId = String(formData.get("submission_id") || "").trim();
+    if (!submissionId) redirect("/students/solicitacoes-matricula?error=" + encodeMsg("Solicitação inválida."));
+    const { error } = await supabase
+      .from("public_enrollment_submissions")
+      .delete()
+      .eq("id", submissionId)
+      .eq("school_id", profile.school_id);
+    if (error) redirect("/students/solicitacoes-matricula?error=" + encodeMsg(error.message));
+    revalidatePath("/students/solicitacoes-matricula");
+    redirect("/students/solicitacoes-matricula?msg=" + encodeMsg("Solicitação excluída com sucesso."));
   }
 
   async function convertAction(formData: FormData) {
@@ -478,6 +571,8 @@ export default async function SolicitacoesMatriculaPage({
               const status = String(submission.status ?? "PENDENTE").toUpperCase();
               const convertedStudent = submission.converted_student_id ? studentsById.get(submission.converted_student_id) ?? null : null;
               const selectedClass = draft.enrollment.class_id ? classesById.get(draft.enrollment.class_id) ?? null : null;
+              const isAdult = isAdultBirthDate(draft.student.birth_date);
+              const age = calculateAge(draft.student.birth_date);
 
               return (
                 <details key={submission.id} open={status !== "CONVERTIDA" && status !== "REJEITADA"} className="panel p-5">
@@ -505,7 +600,7 @@ export default async function SolicitacoesMatriculaPage({
                     </div>
                   </summary>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-4">
+                  <div className="mt-5 grid gap-4 md:grid-cols-5">
                     <div className="panel-inner p-4">
                       <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Estudante</div>
                       <div className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{draft.student.full_name || "—"}</div>
@@ -531,6 +626,16 @@ export default async function SolicitacoesMatriculaPage({
                         <div>Série pretendida: {draft.desired_grade || "—"}</div>
                         <div>Turno preferido: {draft.shift_preference || "—"}</div>
                         <div>Escola de origem: {draft.student.school_origin_name || "—"}</div>
+                      </div>
+                    </div>
+                    <div className="panel-inner p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Endereço</div>
+                      <div className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        <div>CEP: {draft.student.zip_code || "—"}</div>
+                        <div>Logradouro: {draft.student.street || "—"}</div>
+                        <div>Número: {draft.student.street_number || "—"}</div>
+                        <div>Bairro: {draft.student.neighborhood || "—"}</div>
+                        <div>{draft.student.city || "—"}{draft.student.state_code ? ` • ${draft.student.state_code}` : ""}</div>
                       </div>
                     </div>
                     <div className="panel-inner p-4">
@@ -589,21 +694,49 @@ export default async function SolicitacoesMatriculaPage({
                           <span className="text-sm font-semibold">Telefone do estudante</span>
                           <input name="student_phone" type="text" defaultValue={inputValue(draft.student.mobile_phone || draft.student.phone)} className="input" />
                         </label>
+                        <label className="grid gap-2">
+                          <span className="text-sm font-semibold">CEP</span>
+                          <input name="zip_code" type="text" defaultValue={inputValue(draft.student.zip_code)} className="input" />
+                        </label>
                         <label className="grid gap-2 xl:col-span-2">
-                          <span className="text-sm font-semibold">Nome do responsável *</span>
-                          <input name="guardian_name" type="text" defaultValue={inputValue(draft.guardians[0]?.full_name)} required className="input" />
+                          <span className="text-sm font-semibold">Logradouro</span>
+                          <input name="street" type="text" defaultValue={inputValue(draft.student.street)} className="input" />
+                        </label>
+                        <label className="grid gap-2">
+                          <span className="text-sm font-semibold">Número</span>
+                          <input name="street_number" type="text" defaultValue={inputValue(draft.student.street_number)} className="input" />
+                        </label>
+                        <label className="grid gap-2 xl:col-span-2">
+                          <span className="text-sm font-semibold">Complemento</span>
+                          <input name="address_complement" type="text" defaultValue={inputValue(draft.student.address_complement)} className="input" />
+                        </label>
+                        <label className="grid gap-2">
+                          <span className="text-sm font-semibold">Bairro</span>
+                          <input name="neighborhood" type="text" defaultValue={inputValue(draft.student.neighborhood)} className="input" />
+                        </label>
+                        <label className="grid gap-2">
+                          <span className="text-sm font-semibold">Cidade</span>
+                          <input name="city" type="text" defaultValue={inputValue(draft.student.city)} className="input" />
+                        </label>
+                        <label className="grid gap-2">
+                          <span className="text-sm font-semibold">UF</span>
+                          <input name="state_code" type="text" maxLength={2} defaultValue={inputValue(draft.student.state_code)} className="input" />
+                        </label>
+                        <label className="grid gap-2 xl:col-span-2">
+                          <span className="text-sm font-semibold">Nome do responsável {isAdult ? "(opcional)" : "*"}</span>
+                          <input name="guardian_name" type="text" defaultValue={inputValue(draft.guardians[0]?.full_name)} required={!isAdult} className="input" />
                         </label>
                         <label className="grid gap-2">
                           <span className="text-sm font-semibold">Relacionamento</span>
                           <input name="guardian_relationship" type="text" defaultValue={inputValue(draft.guardians[0]?.relationship)} className="input" />
                         </label>
                         <label className="grid gap-2">
-                          <span className="text-sm font-semibold">E-mail do responsável *</span>
-                          <input name="guardian_email" type="email" defaultValue={inputValue(draft.guardians[0]?.email)} required className="input" />
+                          <span className="text-sm font-semibold">E-mail do responsável {isAdult ? "(opcional)" : "*"}</span>
+                          <input name="guardian_email" type="email" defaultValue={inputValue(draft.guardians[0]?.email)} required={!isAdult} className="input" />
                         </label>
                         <label className="grid gap-2">
-                          <span className="text-sm font-semibold">Telefone do responsável *</span>
-                          <input name="guardian_phone" type="text" defaultValue={inputValue(draft.guardians[0]?.mobile_phone || draft.guardians[0]?.phone)} required className="input" />
+                          <span className="text-sm font-semibold">Telefone do responsável {isAdult ? "(opcional)" : "*"}</span>
+                          <input name="guardian_phone" type="text" defaultValue={inputValue(draft.guardians[0]?.mobile_phone || draft.guardians[0]?.phone)} required={!isAdult} className="input" />
                         </label>
                         <label className="grid gap-2">
                           <span className="text-sm font-semibold">Série pretendida</span>
@@ -693,6 +826,12 @@ export default async function SolicitacoesMatriculaPage({
                       </div>
                     </div>
 
+                    {isAdult ? (
+                      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200">
+                        Estudante maior de 18 anos: os dados do responsável são opcionais nesta solicitação.
+                      </div>
+                    ) : null}
+
                     <div className="flex flex-wrap gap-3">
                       {status !== "CONVERTIDA" ? <button type="submit" className="btn btn-secondary">Salvar e aprovar solicitação</button> : null}
                       {status !== "CONVERTIDA" ? (
@@ -708,6 +847,9 @@ export default async function SolicitacoesMatriculaPage({
                       {convertedStudent ? (
                         <Link href="/students" className="btn btn-secondary">Ver estudante convertido: {convertedStudent.full_name || convertedStudent.registration_number || "abrir"}</Link>
                       ) : null}
+                      <ConfirmButton confirmText="Excluir definitivamente esta solicitação de matrícula?" formAction={deleteAction} className="btn btn-ghost text-rose-700 hover:text-rose-800 dark:text-rose-300">
+                        Excluir solicitação
+                      </ConfirmButton>
                     </div>
                   </form>
                 </details>

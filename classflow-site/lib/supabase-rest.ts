@@ -72,13 +72,22 @@ export type PublicEnrollmentPayload = {
   student_cpf?: string
   student_email?: string
   student_phone?: string
-  guardian_name: string
-  guardian_email: string
-  guardian_phone: string
+  student_zip_code: string
+  student_address_line1: string
+  student_address_number: string
+  student_address_line2?: string
+  student_neighborhood: string
+  student_city: string
+  student_state: string
+  guardian_name?: string
+  guardian_email?: string
+  guardian_phone?: string
   desired_grade: string
   shift_preference?: string
   previous_school?: string
   notes?: string
+  student_age?: number
+  is_adult_student?: boolean
 }
 
 export async function insertPublicEnrollment(payload: PublicEnrollmentPayload) {
@@ -95,9 +104,9 @@ export async function insertPublicEnrollment(payload: PublicEnrollmentPayload) {
     student_cpf: payload.student_cpf || null,
     student_email: payload.student_email || null,
     student_phone: payload.student_phone || null,
-    guardian_name: payload.guardian_name,
-    guardian_email: payload.guardian_email,
-    guardian_phone: payload.guardian_phone,
+    guardian_name: payload.guardian_name || null,
+    guardian_email: payload.guardian_email || null,
+    guardian_phone: payload.guardian_phone || null,
     desired_grade: payload.desired_grade,
     shift_preference: payload.shift_preference || null,
     previous_school: payload.previous_school || null,
@@ -105,7 +114,18 @@ export async function insertPublicEnrollment(payload: PublicEnrollmentPayload) {
     status: 'PENDENTE',
     source: 'SITE_PUBLICO',
     submitted_at: new Date().toISOString(),
-    payload,
+    payload: {
+      ...payload,
+      student_address: {
+        zip_code: payload.student_zip_code,
+        address_line1: payload.student_address_line1,
+        address_number: payload.student_address_number,
+        address_line2: payload.student_address_line2 || null,
+        neighborhood: payload.student_neighborhood,
+        city: payload.student_city,
+        state: payload.student_state,
+      },
+    },
   }
 
   const response = await fetch(getRestUrl(SUPABASE_PUBLIC_ENROLLMENT_TABLE), {

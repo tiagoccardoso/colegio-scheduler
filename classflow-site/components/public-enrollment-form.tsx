@@ -16,6 +16,13 @@ type FormState = {
   student_cpf: string
   student_email: string
   student_phone: string
+  student_zip_code: string
+  student_address_line1: string
+  student_address_number: string
+  student_address_line2: string
+  student_neighborhood: string
+  student_city: string
+  student_state: string
   guardian_name: string
   guardian_email: string
   guardian_phone: string
@@ -33,6 +40,13 @@ const initialState: FormState = {
   student_cpf: '',
   student_email: '',
   student_phone: '',
+  student_zip_code: '',
+  student_address_line1: '',
+  student_address_number: '',
+  student_address_line2: '',
+  student_neighborhood: '',
+  student_city: '',
+  student_state: '',
   guardian_name: '',
   guardian_email: '',
   guardian_phone: '',
@@ -64,6 +78,17 @@ function Field({
 
 const inputClass =
   'h-11 rounded-xl border border-black/10 bg-white px-3 text-sm text-zinc-900 shadow-soft outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-100'
+
+function calculateAge(dateString: string) {
+  if (!dateString) return null
+  const birth = new Date(`${dateString}T00:00:00`)
+  if (Number.isNaN(birth.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age -= 1
+  return age >= 0 ? age : null
+}
 
 export function PublicEnrollmentForm() {
   const [schools, setSchools] = useState<SchoolOption[]>([])
@@ -102,6 +127,9 @@ export function PublicEnrollmentForm() {
     [schools, form.school_id]
   )
 
+  const studentAge = useMemo(() => calculateAge(form.student_birth_date), [form.student_birth_date])
+  const isAdultStudent = studentAge != null && studentAge >= 18
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }))
     if (submitError) setSubmitError(null)
@@ -115,6 +143,11 @@ export function PublicEnrollmentForm() {
 
     if (!selectedSchool) {
       setSubmitError('Selecione o colégio em que deseja solicitar a matrícula.')
+      return
+    }
+
+    if (!isAdultStudent && (!form.guardian_name.trim() || !form.guardian_email.trim() || !form.guardian_phone.trim())) {
+      setSubmitError('Para estudantes menores de 18 anos, os dados do responsável são obrigatórios.')
       return
     }
 
@@ -215,6 +248,13 @@ export function PublicEnrollmentForm() {
             </Field>
           </div>
 
+          {studentAge != null ? (
+            <div className="rounded-xl border border-black/10 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+              <span className="font-semibold text-zinc-900">Idade calculada automaticamente:</span> {studentAge} {studentAge === 1 ? 'ano' : 'anos'}.
+              {isAdultStudent ? ' Como o aluno tem 18 anos ou mais, os dados do responsável são opcionais.' : ' Como o aluno é menor de idade, os dados do responsável são obrigatórios.'}
+            </div>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-3">
             <Field label="CPF do estudante">
               <input className={inputClass} value={form.student_cpf} onChange={(e) => update('student_cpf', e.target.value)} />
@@ -227,31 +267,64 @@ export function PublicEnrollmentForm() {
             </Field>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Nome do responsável" required>
-              <input className={inputClass} value={form.guardian_name} onChange={(e) => update('guardian_name', e.target.value)} required />
-            </Field>
-            <Field label="E-mail do responsável" required>
-              <input type="email" className={inputClass} value={form.guardian_email} onChange={(e) => update('guardian_email', e.target.value)} required />
-            </Field>
+          <div className="rounded-2xl border border-black/5 p-4">
+            <div className="text-sm font-semibold text-zinc-900">Endereço do estudante</div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <Field label="CEP" required>
+                <input className={inputClass} value={form.student_zip_code} onChange={(e) => update('student_zip_code', e.target.value)} required />
+              </Field>
+              <Field label="Cidade" required>
+                <input className={inputClass} value={form.student_city} onChange={(e) => update('student_city', e.target.value)} required />
+              </Field>
+              <Field label="UF" required>
+                <input className={inputClass} value={form.student_state} onChange={(e) => update('student_state', e.target.value)} maxLength={2} required />
+              </Field>
+              <Field label="Logradouro" required>
+                <input className={inputClass} value={form.student_address_line1} onChange={(e) => update('student_address_line1', e.target.value)} required />
+              </Field>
+              <Field label="Número" required>
+                <input className={inputClass} value={form.student_address_number} onChange={(e) => update('student_address_number', e.target.value)} required />
+              </Field>
+              <Field label="Complemento">
+                <input className={inputClass} value={form.student_address_line2} onChange={(e) => update('student_address_line2', e.target.value)} />
+              </Field>
+              <Field label="Bairro" required>
+                <input className={inputClass} value={form.student_neighborhood} onChange={(e) => update('student_neighborhood', e.target.value)} required />
+              </Field>
+            </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Telefone do responsável" required>
-              <input className={inputClass} value={form.guardian_phone} onChange={(e) => update('guardian_phone', e.target.value)} required />
-            </Field>
-            <Field label="Série pretendida" required>
-              <input className={inputClass} value={form.desired_grade} onChange={(e) => update('desired_grade', e.target.value)} placeholder="Ex.: 1º ano" required />
-            </Field>
-            <Field label="Turno de preferência">
-              <select className={inputClass} value={form.shift_preference} onChange={(e) => update('shift_preference', e.target.value)}>
-                <option value="">Selecione</option>
-                <option value="Manhã">Manhã</option>
-                <option value="Tarde">Tarde</option>
-                <option value="Noite">Noite</option>
-                <option value="Integral">Integral</option>
-              </select>
-            </Field>
+          <div className="rounded-2xl border border-black/5 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-zinc-900">Responsável</div>
+              <span className="text-xs text-zinc-500">{isAdultStudent ? 'Opcional para maiores de 18 anos' : 'Obrigatório para menores de 18 anos'}</span>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Field label="Nome do responsável" required={!isAdultStudent}>
+                <input className={inputClass} value={form.guardian_name} onChange={(e) => update('guardian_name', e.target.value)} required={!isAdultStudent} />
+              </Field>
+              <Field label="E-mail do responsável" required={!isAdultStudent}>
+                <input type="email" className={inputClass} value={form.guardian_email} onChange={(e) => update('guardian_email', e.target.value)} required={!isAdultStudent} />
+              </Field>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <Field label="Telefone do responsável" required={!isAdultStudent}>
+                <input className={inputClass} value={form.guardian_phone} onChange={(e) => update('guardian_phone', e.target.value)} required={!isAdultStudent} />
+              </Field>
+              <Field label="Série pretendida" required>
+                <input className={inputClass} value={form.desired_grade} onChange={(e) => update('desired_grade', e.target.value)} placeholder="Ex.: 1º ano" required />
+              </Field>
+              <Field label="Turno de preferência">
+                <select className={inputClass} value={form.shift_preference} onChange={(e) => update('shift_preference', e.target.value)}>
+                  <option value="">Selecione</option>
+                  <option value="Manhã">Manhã</option>
+                  <option value="Tarde">Tarde</option>
+                  <option value="Noite">Noite</option>
+                  <option value="Integral">Integral</option>
+                </select>
+              </Field>
+            </div>
           </div>
 
           <Field label="Escola de origem">
@@ -259,19 +332,10 @@ export function PublicEnrollmentForm() {
           </Field>
 
           <Field label="Observações adicionais">
-            <textarea
-              className="min-h-[120px] rounded-xl border border-black/10 bg-white px-3 py-3 text-sm text-zinc-900 shadow-soft outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
-              value={form.notes}
-              onChange={(e) => update('notes', e.target.value)}
-              placeholder="Conte alguma informação importante para o colégio analisar sua solicitação."
-            />
+            <textarea className={`${inputClass} min-h-[110px] py-3`} value={form.notes} onChange={(e) => update('notes', e.target.value)} />
           </Field>
 
-          <button
-            type="submit"
-            disabled={submitting || loadingSchools}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white shadow-soft hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <button type="submit" className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white shadow-soft hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={submitting || loadingSchools}>
             {submitting ? 'Enviando solicitação...' : 'Enviar solicitação de matrícula'}
           </button>
         </form>

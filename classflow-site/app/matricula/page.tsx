@@ -16,7 +16,7 @@ export default function MatriculaPage() {
         <div className="mt-5 max-w-3xl">
           <SectionTitle
             title="Solicite sua matrícula online"
-            description="Escolha o colégio desejado, preencha os dados do estudante e do responsável e envie a solicitação. O colégio receberá o pedido no sistema para revisar e aprovar a efetivação do cadastro."
+            description="Escolha o colégio desejado, preencha os dados do estudante, endereço e, quando necessário, os dados do responsável. O colégio receberá o pedido no sistema para revisar e aprovar a efetivação do cadastro."
           />
         </div>
 
