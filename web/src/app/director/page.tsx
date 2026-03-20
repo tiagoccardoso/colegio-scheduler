@@ -81,7 +81,7 @@ export default async function DirectorProfilePage({
 
   const { data: school } = await supabase
     .from("schools")
-    .select("id,name")
+    .select("id,name,public_enrollment_visible")
     .eq("id", profile.school_id)
     .maybeSingle();
 
@@ -100,6 +100,7 @@ export default async function DirectorProfilePage({
 
     const full_name = String(formData.get("full_name") || "").trim();
     const school_name = String(formData.get("school_name") || "").trim();
+    const public_enrollment_visible = formData.get("public_enrollment_visible") === "on";
     const logo = formData.get("logo") as File | null;
 
     if (!full_name) redirect("/director?error=" + encodeMsg("Informe seu nome."));
@@ -112,6 +113,7 @@ export default async function DirectorProfilePage({
         {
           id: profile.school_id,
           name: school_name,
+          public_enrollment_visible,
         },
         { onConflict: "id" },
       );
@@ -375,6 +377,26 @@ export default async function DirectorProfilePage({
               <label className="grid gap-2">
                 <span className="text-sm font-semibold">Nome do colégio</span>
                 <input name="school_name" defaultValue={(school as any)?.name ?? ""} className="input" />
+              </label>
+            </div>
+
+            <div className="mt-4 panel-inner p-4">
+              <label className="flex items-start gap-3 rounded-2xl border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
+                <input
+                  name="public_enrollment_visible"
+                  type="checkbox"
+                  defaultChecked={(school as any)?.public_enrollment_visible !== false}
+                  className="mt-1 h-4 w-4"
+                />
+                <span className="grid gap-1">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    Mostrar este colégio na lista pública de escolas disponíveis para matrícula
+                  </span>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Desmarque esta opção se você quiser ocultar o colégio da vitrine pública de matrículas.
+                    As solicitações já recebidas continuam salvas normalmente.
+                  </span>
+                </span>
               </label>
             </div>
           </section>
