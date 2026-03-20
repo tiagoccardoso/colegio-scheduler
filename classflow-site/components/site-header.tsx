@@ -9,6 +9,7 @@ const nav = [
   { href: '/produto', label: 'Produto' },
   { href: '/planos', label: 'Planos' },
   { href: '/treinamentos', label: 'Treinamentos' },
+  { href: '/matricula', label: 'Matrícula' },
   { href: '/contato', label: 'Contato' },
 ]
 
@@ -59,10 +60,10 @@ export function SiteHeader() {
             Acessar sistema
           </a>
           <Link
-            href="/contato"
+            href="/matricula"
             className="inline-flex h-10 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-soft hover:bg-brand-700"
           >
-            Agendar demo
+            Fazer matrícula
           </Link>
         </div>
       </div>

@@ -33,6 +33,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/subjects", label: "Disciplinas" },
       { href: "/students", label: "Estudantes" },
+      { href: "/students/solicitacoes-matricula", label: "Solicitações de matrícula" },
       { href: "/rooms", label: "Salas" },
       { href: "/classes", label: "Turmas" },
       { href: "/time-slots", label: "Horários" },
