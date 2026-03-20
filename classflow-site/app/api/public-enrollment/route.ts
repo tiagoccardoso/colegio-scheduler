@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { insertPublicEnrollment } from '@/lib/supabase-rest'
+import { insertPublicEnrollment, isSchoolPublicEnrollmentVisible } from '@/lib/supabase-rest'
 
 function isEmail(value: string) {
   return /.+@.+\..+/.test(value)
@@ -59,8 +59,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Informe um e-mail válido do responsável.' }, { status: 400 })
     }
 
+    const schoolId = String(data.school_id).trim()
+    const schoolIsVisible = await isSchoolPublicEnrollmentVisible(schoolId)
+    if (!schoolIsVisible) {
+      return NextResponse.json(
+        { error: 'Este colégio não está disponível para matrícula pública no momento.' },
+        { status: 400 }
+      )
+    }
+
     await insertPublicEnrollment({
-      school_id: String(data.school_id).trim(),
+      school_id: schoolId,
       school_name: String(data.school_name).trim(),
       student_name: String(data.student_name).trim(),
       student_birth_date: String(data.student_birth_date).trim(),

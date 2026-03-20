@@ -41,6 +41,7 @@ export async function fetchSchoolsFromSupabase(): Promise<SchoolOption[]> {
   const query = new URLSearchParams({
     select: `${SUPABASE_SCHOOL_ID_COLUMN},${SUPABASE_SCHOOL_NAME_COLUMN}`,
     order: `${SUPABASE_SCHOOL_NAME_COLUMN}.asc`,
+    public_enrollment_visible: 'eq.true',
   })
 
   const response = await fetch(getRestUrl(SUPABASE_SCHOOLS_TABLE, query.toString()), {
@@ -62,6 +63,30 @@ export async function fetchSchoolsFromSupabase(): Promise<SchoolOption[]> {
       name: String(row[SUPABASE_SCHOOL_NAME_COLUMN] ?? ''),
     }))
     .filter((row) => row.id && row.name)
+}
+
+export async function isSchoolPublicEnrollmentVisible(schoolId: string) {
+  const headers = getSupabaseHeaders()
+  const query = new URLSearchParams({
+    select: `${SUPABASE_SCHOOL_ID_COLUMN}`,
+    [SUPABASE_SCHOOL_ID_COLUMN]: `eq.${schoolId}`,
+    public_enrollment_visible: 'eq.true',
+    limit: '1',
+  })
+
+  const response = await fetch(getRestUrl(SUPABASE_SCHOOLS_TABLE, query.toString()), {
+    method: 'GET',
+    headers,
+    cache: 'no-store',
+  })
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(`Não foi possível validar a visibilidade do colégio. ${message}`)
+  }
+
+  const rows = (await response.json()) as Record<string, unknown>[]
+  return Array.isArray(rows) && rows.length > 0
 }
 
 export type PublicEnrollmentPayload = {
