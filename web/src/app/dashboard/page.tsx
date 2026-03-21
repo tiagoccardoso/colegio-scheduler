@@ -3,13 +3,11 @@ import Link from "next/link";
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
 import { DashboardSetupChat } from "@/components/DashboardSetupChat";
+import { PlansCatalog } from "@/components/PlansCatalog";
 import { getNavSections } from "@/components/nav";
 import { requireStaff } from "@/lib/require-staff";
 import { decodeMsg } from "@/lib/flash";
-import {
-  getEffectiveAccess,
-  getSchoolSubscription,
-} from "@/lib/billing";
+import { getEffectiveAccess, getSchoolSubscription } from "@/lib/billing";
 
 export default async function DashboardPage({
   searchParams,
@@ -44,6 +42,7 @@ export default async function DashboardPage({
   // A regra de verdade continua sendo aplicada em /billing (server action).
   const sub = await getSchoolSubscription(supabase as any, profile.school_id);
   const hasEverSubscribed = Boolean(sub?.stripe_subscription_id || sub?.status);
+  const trialDaysLabel = process.env.NEXT_PUBLIC_TRIAL_DAYS ?? process.env.STRIPE_TRIAL_DAYS ?? "7";
 
   return (
     <Shell
@@ -68,93 +67,64 @@ export default async function DashboardPage({
               </div>
 
               <div className="panel p-5">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-base font-semibold">Plano Profissional</div>
-                    <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                      Escolha uma opção para liberar cadastros, grade e relatórios.
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-500">Checkout seguro via Stripe.</div>
-                </div>
-
-                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-                  <li>Cadastros ilimitados (turmas, professores, salas)</li>
-                  <li>Montagem de grade com revisão de conflitos</li>
-                  <li>Relatórios (matriz curricular/turma/sala/professor/hora atividade)</li>
-                </ul>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div
-                    className={
-                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
-                      (selectedPlan === "trial"
-                        ? "border-zinc-900 dark:border-white"
-                        : "border-zinc-200 dark:border-zinc-900")
-                    }
-                  >
-                    <div className="text-sm font-semibold">Teste grátis</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">
-                      {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      R$ 0 no período de teste. Cartão obrigatório. Cobrança após o trial no plano mensal.
-                    </div>
-                    {hasEverSubscribed ? (
-                      <div
-                        className="btn btn-primary mt-4 w-full opacity-50 cursor-not-allowed"
-                        title="Teste grátis disponível apenas na primeira assinatura do colégio."
-                        aria-disabled="true"
-                      >
-                        Teste já utilizado
-                      </div>
-                    ) : (
-                      <Link className="btn btn-primary mt-4 w-full" href="/billing?plan=trial">
-                        Começar teste grátis
-                      </Link>
-                    )}
-                  </div>
-
-                  <div
-                    className={
-                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
-                      (selectedPlan === "monthly"
-                        ? "border-zinc-900 dark:border-white"
-                        : "border-zinc-200 dark:border-zinc-900")
-                    }
-                  >
-                    <div className="text-sm font-semibold">Mensal</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">
-                      {process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal"}
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Pagamento recorrente mensal.</div>
-                    <Link className="btn btn-primary mt-4 w-full" href="/billing?plan=monthly">
-                      Assinar mensal
-                    </Link>
-                  </div>
-
-                  <div
-                    className={
-                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
-                      (selectedPlan === "yearly"
-                        ? "border-zinc-900 dark:border-white"
-                        : "border-zinc-200 dark:border-zinc-900")
-                    }
-                  >
-                    <div className="text-sm font-semibold">Anual</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">
-                      {process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual"}
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Pagamento recorrente anual.</div>
-                    <Link className="btn btn-primary mt-4 w-full" href="/billing?plan=yearly">
-                      Assinar anual
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="mt-3 text-xs text-zinc-500">
-                  Após a confirmação do Stripe, o sistema é liberado automaticamente.
-                </div>
+                <PlansCatalog
+                  checkoutNote="Checkout seguro via Stripe. Após a confirmação, o sistema é liberado automaticamente."
+                  topNote={
+                    <>
+                      Após a assinatura, sua escola libera acesso completo para direção, coordenação, secretaria,
+                      cadastros, grade, Novo Ensino Médio, documentos, relatórios e recursos com IA.
+                      <span className="block mt-1 text-xs font-normal text-zinc-600 dark:text-zinc-400">
+                        Primeira assinatura ganha teste grátis de {trialDaysLabel} dias (cartão obrigatório).
+                      </span>
+                    </>
+                  }
+                  cards={[
+                    {
+                      title: "Teste grátis",
+                      price: `R$ 0 por ${trialDaysLabel} dias`,
+                      note: `Experimente sem custo por ${trialDaysLabel} dias. Após o período de teste, a cobrança continua no plano mensal.`,
+                      badge: "Comece aqui",
+                      selected: selectedPlan === "trial",
+                      action: hasEverSubscribed ? (
+                        <div
+                          className="btn btn-primary w-full opacity-50 cursor-not-allowed"
+                          title="Teste grátis disponível apenas na primeira assinatura do colégio."
+                          aria-disabled="true"
+                        >
+                          Teste já utilizado
+                        </div>
+                      ) : (
+                        <Link className="btn btn-primary w-full" href="/billing?plan=trial">
+                          Começar teste grátis
+                        </Link>
+                      ),
+                      footer: hasEverSubscribed ? "Disponível apenas na primeira assinatura desta escola." : undefined,
+                    },
+                    {
+                      title: "Mensal",
+                      price: process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal",
+                      note: "Renovação automática. Cancele quando quiser. Libera exatamente os mesmos recursos dos outros planos.",
+                      selected: selectedPlan === "monthly",
+                      action: (
+                        <Link className="btn btn-primary w-full" href="/billing?plan=monthly">
+                          Assinar mensal
+                        </Link>
+                      ),
+                    },
+                    {
+                      title: "Anual",
+                      price: process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual",
+                      note: "Economize e tenha previsibilidade no ano todo. Libera exatamente os mesmos recursos dos outros planos.",
+                      highlight: true,
+                      selected: selectedPlan === "yearly",
+                      action: (
+                        <Link className="btn btn-primary w-full" href="/billing?plan=yearly">
+                          Assinar anual
+                        </Link>
+                      ),
+                    },
+                  ]}
+                />
               </div>
             </div>
           ) : (
@@ -229,8 +199,7 @@ export default async function DashboardPage({
             </div>
           </div>
         )}
-      {active && isDirector ? <DashboardSetupChat /> : null}
-
+        {active && isDirector ? <DashboardSetupChat /> : null}
       </div>
     </Shell>
   );

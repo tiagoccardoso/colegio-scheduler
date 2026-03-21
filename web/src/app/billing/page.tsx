@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
+import { PlansCatalog } from "@/components/PlansCatalog";
 import { getNavSections } from "@/components/nav";
 import { requireDirector } from "@/lib/require-director";
 import { decodeMsg, encodeMsg } from "@/lib/flash";
@@ -35,7 +36,6 @@ export default async function BillingPage({
   const msg = typeof sp.msg === "string" ? decodeMsg(sp.msg) : null;
   const error = typeof sp.error === "string" ? decodeMsg(sp.error) : null;
 
-
   const sub = await getSchoolSubscription(supabase as any, profile.school_id);
   const paidActive = isSubscriptionActive(sub?.status);
   const hasEverSubscribed = Boolean(sub?.stripe_subscription_id || sub?.status);
@@ -45,6 +45,7 @@ export default async function BillingPage({
 
   // "Acesso" significa: assinatura paga ativa OU cortesia ativa.
   const hasAccess = paidActive || courtesyActive;
+  const trialDaysLabel = process.env.NEXT_PUBLIC_TRIAL_DAYS ?? process.env.STRIPE_TRIAL_DAYS ?? "7";
 
   async function startCheckout(formData: FormData) {
     "use server";
@@ -158,7 +159,7 @@ export default async function BillingPage({
 
   async function cancelSubscription() {
     "use server";
-    const { supabase, user, profile } = await requireDirector();
+    const { supabase, profile } = await requireDirector();
 
     const sub = await getSchoolSubscription(supabase as any, profile.school_id);
     const subscriptionId = sub?.stripe_subscription_id;
@@ -246,7 +247,7 @@ export default async function BillingPage({
                 </div>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-4">
                 {courtesyActive ? (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
                     <div className="font-semibold">Acesso liberado por cortesia</div>
@@ -269,113 +270,70 @@ export default async function BillingPage({
                   </div>
                 ) : null}
 
-                <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-900 dark:bg-zinc-950">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="text-base font-semibold">Planos</div>
-                      <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                        Acesso completo à plataforma de organização de horários com inteligência artificial.
-                        <span className="block mt-1 text-xs text-zinc-500">Primeira assinatura ganha teste grátis de {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias (cartão obrigatório).</span>
-                      </div>
-                    </div>
-                    <div className="text-xs text-zinc-500">
-                      A plataforma com inteligência artificial para organizar horários e montar grades escolares sem conflitos.
-                    </div>
-                  </div>
-                  <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-                    <li>Cadastros ilimitados</li>
-                    <li>Grade gerada com apoio da IA</li>
-                    <li>Conflitos identificados e resolvidos</li>
-                  </ul>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div
-                    className={
-                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
-                      (selectedPlan === "trial"
-                        ? "border-zinc-900 dark:border-white"
-                        : "border-zinc-200 dark:border-zinc-900")
-                    }
-                  >
-                    <div className="text-sm font-semibold">Teste grátis</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">
-                      R$ 0 por {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? process.env.STRIPE_TRIAL_DAYS ?? "7"} dias
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      Cartão obrigatório. Cobrança após o período de teste.
-                    </div>
-                    <form action={startCheckout} className="mt-4">
-                      <input type="hidden" name="plan" value="trial" />
-                      <button
-                        className={
-                          "btn btn-primary w-full " +
-                          (hasEverSubscribed ? "opacity-50 cursor-not-allowed" : "")
-                        }
-                        type="submit"
-                        disabled={hasEverSubscribed}
-                        title={hasEverSubscribed ? "Disponível apenas na primeira assinatura desta escola." : ""}
-                      >
-                        Começar teste grátis
-                      </button>
-                    </form>
-                    {hasEverSubscribed ? (
-                      <div className="mt-2 text-xs text-zinc-500">
-                        Disponível apenas na primeira assinatura desta escola.
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div
-                    className={
-                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
-                      (selectedPlan === "monthly"
-                        ? "border-zinc-900 dark:border-white"
-                        : "border-zinc-200 dark:border-zinc-900")
-                    }
-                  >
-                    <div className="text-sm font-semibold">Mensal</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">
-                      {process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal"}
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      Pagamento recorrente mensal.
-                    </div>
-                    <form action={startCheckout} className="mt-4">
-                      <input type="hidden" name="plan" value="monthly" />
-                      <button className="btn btn-primary w-full" type="submit">
-                        Assinar mensal
-                      </button>
-                    </form>
-                  </div>
-
-                  <div
-                    className={
-                      "rounded-2xl border bg-white p-4 shadow-sm dark:bg-zinc-950 " +
-                      (selectedPlan === "yearly"
-                        ? "border-zinc-900 dark:border-white"
-                        : "border-zinc-200 dark:border-zinc-900")
-                    }
-                  >
-                    <div className="text-sm font-semibold">Anual</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">
-                      {process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual"}
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      Pagamento recorrente anual.
-                    </div>
-                    <form action={startCheckout} className="mt-4">
-                      <input type="hidden" name="plan" value="yearly" />
-                      <button className="btn btn-primary w-full" type="submit">
-                        Assinar anual
-                      </button>
-                    </form>
-                  </div>
-                </div>
-
-                <div className="text-xs text-zinc-500">
-                  Você será redirecionado para o checkout seguro do Stripe.
-                </div>
+                <PlansCatalog
+                  checkoutNote="Você será redirecionado para o checkout seguro do Stripe."
+                  topNote={
+                    <>
+                      Após a assinatura, sua escola libera acesso completo para direção, coordenação, secretaria,
+                      cadastros, grade, Novo Ensino Médio, documentos, relatórios e recursos com IA.
+                      <span className="block mt-1 text-xs font-normal text-zinc-600 dark:text-zinc-400">
+                        Primeira assinatura ganha teste grátis de {trialDaysLabel} dias (cartão obrigatório).
+                      </span>
+                    </>
+                  }
+                  cards={[
+                    {
+                      title: "Teste grátis",
+                      price: `R$ 0 por ${trialDaysLabel} dias`,
+                      note: `Experimente sem custo por ${trialDaysLabel} dias. Após o período de teste, a cobrança continua no plano mensal.`,
+                      badge: "Comece aqui",
+                      selected: selectedPlan === "trial",
+                      action: (
+                        <form action={startCheckout}>
+                          <input type="hidden" name="plan" value="trial" />
+                          <button
+                            className={"btn btn-primary w-full " + (hasEverSubscribed ? "opacity-50 cursor-not-allowed" : "")}
+                            type="submit"
+                            disabled={hasEverSubscribed}
+                            title={hasEverSubscribed ? "Disponível apenas na primeira assinatura desta escola." : ""}
+                          >
+                            Começar teste grátis
+                          </button>
+                        </form>
+                      ),
+                      footer: hasEverSubscribed ? "Disponível apenas na primeira assinatura desta escola." : undefined,
+                    },
+                    {
+                      title: "Mensal",
+                      price: process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal",
+                      note: "Renovação automática. Cancele quando quiser. Libera exatamente os mesmos recursos dos outros planos.",
+                      selected: selectedPlan === "monthly",
+                      action: (
+                        <form action={startCheckout}>
+                          <input type="hidden" name="plan" value="monthly" />
+                          <button className="btn btn-primary w-full" type="submit">
+                            Assinar mensal
+                          </button>
+                        </form>
+                      ),
+                    },
+                    {
+                      title: "Anual",
+                      price: process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual",
+                      note: "Economize e tenha previsibilidade no ano todo. Libera exatamente os mesmos recursos dos outros planos.",
+                      highlight: true,
+                      selected: selectedPlan === "yearly",
+                      action: (
+                        <form action={startCheckout}>
+                          <input type="hidden" name="plan" value="yearly" />
+                          <button className="btn btn-primary w-full" type="submit">
+                            Assinar anual
+                          </button>
+                        </form>
+                      ),
+                    },
+                  ]}
+                />
 
                 {profile.role !== "director" ? (
                   <div className="text-sm text-zinc-700 dark:text-zinc-300">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Flash } from "@/components/Flash";
+import { PlansCatalog } from "@/components/PlansCatalog";
 
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
@@ -63,89 +64,59 @@ function JourneyStep({
 
 function PlanCards({ onPick }: { onPick: (plan: "trial" | "monthly" | "yearly") => void }) {
   return (
-    <div className="panel-solid p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-            Planos e ativação
-          </div>
-          <div className="mt-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Escolha como iniciar sua escola na plataforma
-          </div>
-        </div>
-        <div className="badge">Checkout seguro via Stripe</div>
-      </div>
-
-      <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-        Depois do login, o diretor conclui a assinatura e libera o uso completo da plataforma para a equipe.
-        O acesso inclui grade, calendário, NEM, estudantes, documentos e relatórios.
-      </p>
-
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <div className="rounded-[28px] border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 p-5 shadow-sm dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900/70">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">Teste grátis</div>
-            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100">
-              Melhor para começar
-            </span>
-          </div>
-          <div className="mt-3 text-3xl font-semibold tracking-tight">
-            {process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias
-          </div>
-          <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Explore o sistema completo, valide a operação da escola e avance para o plano mensal ao fim do período.
-          </p>
-          <ul className="mt-4 space-y-2">
-            <Bullet>Onboarding da escola e diretor</Bullet>
-            <Bullet>Configuração inicial com apoio de IA</Bullet>
-            <Bullet>Checkout habilitado no fluxo da conta</Bullet>
-          </ul>
-          <button type="button" onClick={() => onPick("trial")} className="btn btn-primary mt-5 w-full">
-            Começar teste grátis
-          </button>
-        </div>
-
-        <div className="rounded-[28px] border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 p-5 shadow-sm dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900/70">
-          <div className="text-sm font-semibold">Plano mensal</div>
-          <div className="mt-3 text-3xl font-semibold tracking-tight">
-            {process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal"}
-          </div>
-          <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Ideal para implantação rápida, com cobrança recorrente mensal e acesso contínuo para a escola.
-          </p>
-          <ul className="mt-4 space-y-2">
-            <Bullet>Gestão acadêmica completa</Bullet>
-            <Bullet>Grade, NEM, documentos e relatórios</Bullet>
-            <Bullet>IA aplicada à rotina escolar</Bullet>
-          </ul>
-          <button type="button" onClick={() => onPick("monthly")} className="btn btn-secondary mt-5 w-full">
-            Assinar plano mensal
-          </button>
-        </div>
-
-        <div className="rounded-[28px] border border-zinc-900 bg-zinc-900 p-5 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">Plano anual</div>
-            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-950">
-              Melhor custo-benefício
-            </span>
-          </div>
-          <div className="mt-3 text-3xl font-semibold tracking-tight">
-            {process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual"}
-          </div>
-          <p className="mt-3 text-sm leading-6 text-zinc-300 dark:text-zinc-700">
-            Para escolas que querem implantar, consolidar processos e operar o ano letivo inteiro na plataforma.
-          </p>
-          <ul className="mt-4 space-y-2 text-zinc-100 dark:text-zinc-800">
-            <Bullet>Melhor previsibilidade financeira</Bullet>
-            <Bullet>Implantação com continuidade ao longo do ano</Bullet>
-            <Bullet>Fluxo completo da escola em um só ambiente</Bullet>
-          </ul>
-          <button type="button" onClick={() => onPick("yearly")} className="btn mt-5 w-full bg-white text-zinc-950 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-white dark:hover:bg-zinc-900">
-            Assinar plano anual
-          </button>
-        </div>
-      </div>
+    <div className="panel-solid p-5 sm:p-6">
+      <PlansCatalog
+        checkoutNote="Checkout seguro via Stripe"
+        topNote={
+          <>
+            Após a assinatura, sua escola libera acesso completo para direção, coordenação, secretaria,
+            cadastros, grade, Novo Ensino Médio, documentos, relatórios e recursos com IA.
+          </>
+        }
+        cards={[
+          {
+            title: "Teste grátis",
+            price: `${process.env.NEXT_PUBLIC_TRIAL_DAYS ?? "7"} dias`,
+            note:
+              "Primeira assinatura com período de avaliação. Libera exatamente os mesmos recursos dos outros planos durante a vigência do teste.",
+            badge: "Melhor para começar",
+            action: (
+              <button type="button" onClick={() => onPick("trial")} className="btn btn-primary w-full">
+                Começar teste grátis
+              </button>
+            ),
+            footer: "Cartão obrigatório no checkout.",
+          },
+          {
+            title: "Mensal",
+            price: process.env.NEXT_PUBLIC_PLAN_MONTHLY_PRICE ?? "Mensal",
+            note:
+              "Renovação automática. Cancele quando quiser. Libera exatamente os mesmos recursos dos outros planos.",
+            action: (
+              <button type="button" onClick={() => onPick("monthly")} className="btn btn-secondary w-full">
+                Assinar plano mensal
+              </button>
+            ),
+          },
+          {
+            title: "Anual",
+            price: process.env.NEXT_PUBLIC_PLAN_YEARLY_PRICE ?? "Anual",
+            note:
+              "Economize e tenha previsibilidade no ano todo. Libera exatamente os mesmos recursos dos outros planos.",
+            badge: "Melhor custo-benefício",
+            highlight: true,
+            action: (
+              <button
+                type="button"
+                onClick={() => onPick("yearly")}
+                className="btn w-full bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100"
+              >
+                Assinar plano anual
+              </button>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -250,7 +221,7 @@ export default function LoginPage() {
 
   return (
     <div className="page-container py-8 sm:py-10 lg:py-12">
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.9fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <section className="panel relative overflow-hidden p-6 sm:p-8 lg:p-10">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -left-12 top-0 h-40 w-40 rounded-full bg-indigo-500/15 blur-3xl" />
@@ -297,7 +268,7 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="mt-8 grid gap-6 2xl:grid-cols-[1.1fr_0.9fr]">
               <div className="panel-inner p-5 sm:p-6">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
                   O que você encontra ao entrar
@@ -328,14 +299,10 @@ export default function LoginPage() {
                   <JourneyStep
                     number="3"
                     title="Ative o plano e libere a equipe"
-                    description="Escolha teste, plano mensal ou anual e habilite o uso do sistema para a operação escolar."
+                    description="Escolha teste grátis, plano mensal ou anual e libere os mesmos recursos da plataforma para a operação escolar."
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="mt-8">
-              <PlanCards onPick={pickPlan} />
             </div>
           </div>
         </section>
@@ -510,6 +477,24 @@ export default function LoginPage() {
           </div>
         </section>
       </div>
+
+      <section className="panel mt-6 p-5 sm:p-6 lg:p-8">
+        <div className="max-w-5xl">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+            Planos e assinatura
+          </div>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-100">
+            Escolha a vigência e veja tudo o que a escola libera ao assinar.
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-600 sm:text-base dark:text-zinc-400">
+            Reorganizamos esta área para dar mais espaço às informações dos planos. Assim os conteúdos ficam mais legíveis, sem cortes e com os botões de assinatura alinhados no mesmo padrão das outras telas.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <PlanCards onPick={pickPlan} />
+        </div>
+      </section>
     </div>
   );
 }
