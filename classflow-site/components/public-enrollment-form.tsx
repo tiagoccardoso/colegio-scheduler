@@ -6,6 +6,8 @@ import { Card } from '@/components/ui'
 type SchoolOption = {
   id: string
   name: string
+  city: string
+  state_code: string
 }
 
 type FormState = {
@@ -79,7 +81,7 @@ function Field({
 }
 
 const inputClass =
-  'h-11 w-full min-w-0 rounded-xl border border-black/10 bg-white px-3 text-sm leading-5 text-zinc-900 shadow-soft outline-none transition placeholder:text-zinc-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100'
+  'h-11 w-full min-w-0 rounded-xl border border-black/10 bg-white px-3 text-sm leading-5 text-zinc-900 shadow-soft outline-none transition placeholder:text-zinc-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500'
 
 const sectionClass = 'rounded-2xl border border-black/5 bg-zinc-50/80 p-4 sm:p-5'
 
@@ -94,6 +96,10 @@ function calculateAge(dateString: string) {
   return age >= 0 ? age : null
 }
 
+function compareTextAsc(a: string, b: string) {
+  return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
+}
+
 export function PublicEnrollmentForm() {
   const [schools, setSchools] = useState<SchoolOption[]>([])
   const [loadingSchools, setLoadingSchools] = useState(true)
@@ -102,6 +108,8 @@ export function PublicEnrollmentForm() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(initialState)
+  const [selectedStateCode, setSelectedStateCode] = useState('')
+  const [selectedSchoolCity, setSelectedSchoolCity] = useState('')
 
   useEffect(() => {
     let active = true
@@ -109,6 +117,7 @@ export function PublicEnrollmentForm() {
     async function loadSchools() {
       try {
         setLoadingSchools(true)
+        setSchoolError(null)
         const response = await fetch('/api/public-enrollment/schools', { cache: 'no-store' })
         const json = await response.json()
         if (!response.ok) throw new Error(json?.error || 'Erro ao carregar colégios.')
@@ -126,6 +135,35 @@ export function PublicEnrollmentForm() {
     }
   }, [])
 
+  const availableStates = useMemo(() => {
+    const uniqueStates = new Set(
+      schools.map((school) => school.state_code?.trim().toUpperCase()).filter(Boolean)
+    )
+
+    return Array.from(uniqueStates).sort(compareTextAsc)
+  }, [schools])
+
+  const availableCities = useMemo(() => {
+    if (!selectedStateCode) return []
+
+    const uniqueCities = new Set(
+      schools
+        .filter((school) => school.state_code === selectedStateCode)
+        .map((school) => school.city?.trim())
+        .filter(Boolean)
+    )
+
+    return Array.from(uniqueCities).sort(compareTextAsc)
+  }, [schools, selectedStateCode])
+
+  const filteredSchools = useMemo(() => {
+    return schools.filter((school) => {
+      if (selectedStateCode && school.state_code !== selectedStateCode) return false
+      if (selectedSchoolCity && school.city !== selectedSchoolCity) return false
+      return true
+    })
+  }, [schools, selectedStateCode, selectedSchoolCity])
+
   const selectedSchool = useMemo(
     () => schools.find((school) => school.id === form.school_id) || null,
     [schools, form.school_id]
@@ -140,10 +178,31 @@ export function PublicEnrollmentForm() {
     if (success) setSuccess(null)
   }
 
+  function handleStateChange(value: string) {
+    setSelectedStateCode(value)
+    setSelectedSchoolCity('')
+    update('school_id', '')
+  }
+
+  function handleCityChange(value: string) {
+    setSelectedSchoolCity(value)
+    update('school_id', '')
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError(null)
     setSuccess(null)
+
+    if (!selectedStateCode) {
+      setSubmitError('Selecione o estado do colégio desejado.')
+      return
+    }
+
+    if (!selectedSchoolCity) {
+      setSubmitError('Selecione a cidade do colégio desejado.')
+      return
+    }
 
     if (!selectedSchool) {
       setSubmitError('Selecione o colégio em que deseja solicitar a matrícula.')
@@ -176,6 +235,8 @@ export function PublicEnrollmentForm() {
         'Sua solicitação foi enviada com sucesso. Agora o colégio poderá revisar os dados no sistema e aprovar a efetivação da matrícula.'
       )
       setForm(initialState)
+      setSelectedStateCode('')
+      setSelectedSchoolCity('')
     } catch (error: any) {
       setSubmitError(error?.message || 'Erro ao enviar matrícula.')
     } finally {
@@ -189,13 +250,16 @@ export function PublicEnrollmentForm() {
         <div className="text-sm font-semibold text-zinc-900">Como funciona</div>
         <ol className="mt-4 space-y-4 text-sm text-zinc-600">
           <li>
-            <span className="font-semibold text-zinc-900">1. Escolha o colégio.</span> A lista é consultada diretamente no mesmo banco do sistema.
+            <span className="font-semibold text-zinc-900">1. Escolha o estado e a cidade.</span> O site mostra apenas os colégios públicos cadastrados para a localidade selecionada.
           </li>
           <li>
-            <span className="font-semibold text-zinc-900">2. Preencha os dados do estudante e do responsável.</span> O envio cria uma pré-matrícula temporária para análise.
+            <span className="font-semibold text-zinc-900">2. Escolha o colégio.</span> A lista é consultada diretamente no mesmo banco do sistema.
           </li>
           <li>
-            <span className="font-semibold text-zinc-900">3. Aguarde a aprovação do colégio.</span> A equipe da escola verá o pedido no sistema e poderá efetivar o cadastro.
+            <span className="font-semibold text-zinc-900">3. Preencha os dados do estudante e do responsável.</span> O envio cria uma pré-matrícula temporária para análise.
+          </li>
+          <li>
+            <span className="font-semibold text-zinc-900">4. Aguarde a aprovação do colégio.</span> A equipe da escola verá o pedido no sistema e poderá efetivar o cadastro.
           </li>
         </ol>
 
@@ -210,7 +274,7 @@ export function PublicEnrollmentForm() {
       <Card className="p-5 sm:p-6">
         <div className="text-sm font-semibold text-zinc-900">Formulário público de matrícula</div>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-          Preencha os campos abaixo para enviar a solicitação de matrícula. Os dados serão encaminhados ao colégio escolhido para conferência e aprovação.
+          Primeiro selecione o estado e a cidade do colégio desejado. Depois escolha a escola e preencha os dados para enviar a solicitação de matrícula.
         </p>
 
         {schoolError ? (
@@ -228,19 +292,75 @@ export function PublicEnrollmentForm() {
         <form className="mt-6 grid gap-6" onSubmit={onSubmit}>
           <div className={sectionClass}>
             <div className="text-sm font-semibold text-zinc-900">Colégio e estudante</div>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">Comece informando o colégio desejado e os dados principais do estudante.</p>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">Comece escolhendo a localização do colégio. Depois a lista exibirá somente as escolas da cidade selecionada.</p>
 
             <div className="mt-4 grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Estado do colégio" required>
+                  <select
+                    className={inputClass}
+                    value={selectedStateCode}
+                    onChange={(e) => handleStateChange(e.target.value)}
+                    disabled={loadingSchools || !availableStates.length}
+                    required
+                  >
+                    <option value="">
+                      {loadingSchools
+                        ? 'Carregando estados...'
+                        : availableStates.length
+                          ? 'Selecione o estado'
+                          : 'Nenhum estado disponível'}
+                    </option>
+                    {availableStates.map((stateCode) => (
+                      <option key={stateCode} value={stateCode}>
+                        {stateCode}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Cidade do colégio" required>
+                  <select
+                    className={inputClass}
+                    value={selectedSchoolCity}
+                    onChange={(e) => handleCityChange(e.target.value)}
+                    disabled={loadingSchools || !selectedStateCode || !availableCities.length}
+                    required
+                  >
+                    <option value="">
+                      {!selectedStateCode
+                        ? 'Selecione primeiro o estado'
+                        : availableCities.length
+                          ? 'Selecione a cidade'
+                          : 'Nenhuma cidade disponível'}
+                    </option>
+                    {availableCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
               <Field label="Colégio" required>
                 <select
                   className={inputClass}
                   value={form.school_id}
                   onChange={(e) => update('school_id', e.target.value)}
-                  disabled={loadingSchools}
+                  disabled={loadingSchools || !selectedStateCode || !selectedSchoolCity || !filteredSchools.length}
                   required
                 >
-                  <option value="">{loadingSchools ? 'Carregando colégios...' : 'Selecione o colégio'}</option>
-                  {schools.map((school) => (
+                  <option value="">
+                    {!selectedStateCode
+                      ? 'Selecione primeiro o estado'
+                      : !selectedSchoolCity
+                        ? 'Selecione primeiro a cidade'
+                        : filteredSchools.length
+                          ? 'Selecione o colégio'
+                          : 'Nenhum colégio disponível para a cidade selecionada'}
+                  </option>
+                  {filteredSchools.map((school) => (
                     <option key={school.id} value={school.id}>
                       {school.name}
                     </option>

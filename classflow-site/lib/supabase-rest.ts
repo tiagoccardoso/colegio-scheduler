@@ -7,6 +7,8 @@ export const SUPABASE_PUBLIC_ENROLLMENT_TABLE =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLIC_ENROLLMENT_TABLE || 'public_enrollment_submissions'
 export const SUPABASE_SCHOOL_ID_COLUMN = process.env.NEXT_PUBLIC_SUPABASE_SCHOOL_ID_COLUMN || 'id'
 export const SUPABASE_SCHOOL_NAME_COLUMN = process.env.NEXT_PUBLIC_SUPABASE_SCHOOL_NAME_COLUMN || 'name'
+export const SUPABASE_SCHOOL_CITY_COLUMN = process.env.NEXT_PUBLIC_SUPABASE_SCHOOL_CITY_COLUMN || 'city'
+export const SUPABASE_SCHOOL_STATE_COLUMN = process.env.NEXT_PUBLIC_SUPABASE_SCHOOL_STATE_COLUMN || 'state_code'
 
 function getSupabaseHeaders() {
   const key = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY
@@ -34,12 +36,14 @@ function getRestUrl(path: string, query?: string) {
 export type SchoolOption = {
   id: string
   name: string
+  city: string
+  state_code: string
 }
 
 export async function fetchSchoolsFromSupabase(): Promise<SchoolOption[]> {
   const headers = getSupabaseHeaders()
   const query = new URLSearchParams({
-    select: `${SUPABASE_SCHOOL_ID_COLUMN},${SUPABASE_SCHOOL_NAME_COLUMN}`,
+    select: `${SUPABASE_SCHOOL_ID_COLUMN},${SUPABASE_SCHOOL_NAME_COLUMN},${SUPABASE_SCHOOL_CITY_COLUMN},${SUPABASE_SCHOOL_STATE_COLUMN}`,
     order: `${SUPABASE_SCHOOL_NAME_COLUMN}.asc`,
     public_enrollment_visible: 'eq.true',
   })
@@ -61,8 +65,12 @@ export async function fetchSchoolsFromSupabase(): Promise<SchoolOption[]> {
     .map((row) => ({
       id: String(row[SUPABASE_SCHOOL_ID_COLUMN] ?? ''),
       name: String(row[SUPABASE_SCHOOL_NAME_COLUMN] ?? ''),
+      city: String(row[SUPABASE_SCHOOL_CITY_COLUMN] ?? '').trim(),
+      state_code: String(row[SUPABASE_SCHOOL_STATE_COLUMN] ?? '')
+        .trim()
+        .toUpperCase(),
     }))
-    .filter((row) => row.id && row.name)
+    .filter((row) => row.id && row.name && row.city && row.state_code)
 }
 
 export async function isSchoolPublicEnrollmentVisible(schoolId: string) {

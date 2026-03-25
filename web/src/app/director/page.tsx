@@ -5,11 +5,22 @@ import Link from "next/link";
 
 import { Shell } from "@/components/Shell";
 import { Flash } from "@/components/Flash";
+import { SchoolAddressFields } from "@/components/SchoolAddressFields";
 import { requireDirector } from "@/lib/require-director";
 import { decodeMsg, encodeMsg } from "@/lib/flash";
 
 const BUCKET = "school-logos";
 const logoPath = (schoolId: string) => `schools/${schoolId}/logo`;
+
+function cleanOptionalText(value: FormDataEntryValue | null) {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
+function cleanOptionalStateCode(value: FormDataEntryValue | null) {
+  const stateCode = String(value ?? "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(stateCode) ? stateCode : null;
+}
 
 type LogoPick = {
   path: string;
@@ -81,7 +92,7 @@ export default async function DirectorProfilePage({
 
   const { data: school } = await supabase
     .from("schools")
-    .select("id,name,public_enrollment_visible")
+    .select("id,name,public_enrollment_visible,zip_code,address_street,address_number,address_complement,address_neighborhood,city,state_code")
     .eq("id", profile.school_id)
     .maybeSingle();
 
@@ -93,6 +104,7 @@ export default async function DirectorProfilePage({
     ? `${logoPublic.publicUrl}?v=${bust || pickedLogo.version}`
     : null;
 
+
   async function saveAction(formData: FormData) {
     "use server";
 
@@ -101,6 +113,13 @@ export default async function DirectorProfilePage({
     const full_name = String(formData.get("full_name") || "").trim();
     const school_name = String(formData.get("school_name") || "").trim();
     const public_enrollment_visible = formData.get("public_enrollment_visible") === "on";
+    const zip_code = cleanOptionalText(formData.get("zip_code"));
+    const address_street = cleanOptionalText(formData.get("address_street"));
+    const address_number = cleanOptionalText(formData.get("address_number"));
+    const address_complement = cleanOptionalText(formData.get("address_complement"));
+    const address_neighborhood = cleanOptionalText(formData.get("address_neighborhood"));
+    const state_code = cleanOptionalStateCode(formData.get("state_code"));
+    const city = cleanOptionalText(formData.get("city"));
     const logo = formData.get("logo") as File | null;
 
     if (!full_name) redirect("/director?error=" + encodeMsg("Informe seu nome."));
@@ -114,6 +133,13 @@ export default async function DirectorProfilePage({
           id: profile.school_id,
           name: school_name,
           public_enrollment_visible,
+          zip_code,
+          address_street,
+          address_number,
+          address_complement,
+          address_neighborhood,
+          city,
+          state_code,
         },
         { onConflict: "id" },
       );
@@ -378,6 +404,25 @@ export default async function DirectorProfilePage({
                 <span className="text-sm font-semibold">Nome do colégio</span>
                 <input name="school_name" defaultValue={(school as any)?.name ?? ""} className="input" />
               </label>
+            </div>
+
+            <div className="mt-4 panel-inner p-4">
+              <div>
+                <div className="text-sm font-semibold">Endereço da escola</div>
+                <p className="muted mt-1 text-sm">Preencha o endereço completo para manter o cadastro institucional atualizado.</p>
+              </div>
+
+              <SchoolAddressFields
+                defaultValues={{
+                  zipCode: (school as any)?.zip_code ?? "",
+                  street: (school as any)?.address_street ?? "",
+                  number: (school as any)?.address_number ?? "",
+                  complement: (school as any)?.address_complement ?? "",
+                  neighborhood: (school as any)?.address_neighborhood ?? "",
+                  city: (school as any)?.city ?? "",
+                  stateCode: (school as any)?.state_code ?? "",
+                }}
+              />
             </div>
 
             <div className="mt-4 panel-inner p-4">
