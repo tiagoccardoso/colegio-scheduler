@@ -156,6 +156,8 @@ export function PublicEnrollmentForm() {
     return Array.from(uniqueCities).sort(compareTextAsc)
   }, [schools, selectedStateCode])
 
+  const hasSchoolLocations = availableStates.length > 0
+
   const filteredSchools = useMemo(() => {
     return schools.filter((school) => {
       if (selectedStateCode && school.state_code !== selectedStateCode) return false
@@ -281,6 +283,12 @@ export function PublicEnrollmentForm() {
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{schoolError}</div>
         ) : null}
 
+        {!loadingSchools && !schoolError && !hasSchoolLocations ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Nenhum colégio com estado e cidade cadastrados foi encontrado. Verifique se a tabela <strong>schools</strong> possui os campos de localização preenchidos para as escolas liberadas na matrícula pública.
+          </div>
+        ) : null}
+
         {success ? (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{success}</div>
         ) : null}
@@ -301,7 +309,7 @@ export function PublicEnrollmentForm() {
                     className={inputClass}
                     value={selectedStateCode}
                     onChange={(e) => handleStateChange(e.target.value)}
-                    disabled={loadingSchools || !availableStates.length}
+                    disabled={loadingSchools || !!schoolError}
                     required
                   >
                     <option value="">
@@ -309,7 +317,9 @@ export function PublicEnrollmentForm() {
                         ? 'Carregando estados...'
                         : availableStates.length
                           ? 'Selecione o estado'
-                          : 'Nenhum estado disponível'}
+                          : hasSchoolLocations
+                            ? 'Selecione o estado'
+                            : 'Nenhum estado cadastrado'}
                     </option>
                     {availableStates.map((stateCode) => (
                       <option key={stateCode} value={stateCode}>
@@ -324,7 +334,7 @@ export function PublicEnrollmentForm() {
                     className={inputClass}
                     value={selectedSchoolCity}
                     onChange={(e) => handleCityChange(e.target.value)}
-                    disabled={loadingSchools || !selectedStateCode || !availableCities.length}
+                    disabled={loadingSchools || !!schoolError || !selectedStateCode}
                     required
                   >
                     <option value="">
@@ -332,7 +342,7 @@ export function PublicEnrollmentForm() {
                         ? 'Selecione primeiro o estado'
                         : availableCities.length
                           ? 'Selecione a cidade'
-                          : 'Nenhuma cidade disponível'}
+                          : 'Nenhuma cidade cadastrada para este estado'}
                     </option>
                     {availableCities.map((city) => (
                       <option key={city} value={city}>
@@ -348,7 +358,7 @@ export function PublicEnrollmentForm() {
                   className={inputClass}
                   value={form.school_id}
                   onChange={(e) => update('school_id', e.target.value)}
-                  disabled={loadingSchools || !selectedStateCode || !selectedSchoolCity || !filteredSchools.length}
+                  disabled={loadingSchools || !!schoolError || !selectedStateCode || !selectedSchoolCity}
                   required
                 >
                   <option value="">
