@@ -1,5 +1,6 @@
 import { Badge, Card } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
+import { TrackedLink } from '@/components/tracked-link'
 
 export const metadata = { title: 'Planos' }
 
@@ -152,6 +153,7 @@ export default function PlanosPage() {
             ctaLabel="Começar teste"
             badge="Comece aqui"
             features={sharedPlanFeatures}
+            trackingEventName="plans_free_trial_clicked"
           />
           <PricingCard
             title="Mensal"
@@ -160,6 +162,7 @@ export default function PlanosPage() {
             ctaHref={PLANS_LOGIN_URL}
             ctaLabel="Assinar mensal"
             features={sharedPlanFeatures}
+            trackingEventName="plans_monthly_clicked"
           />
           <PricingCard
             title="Anual"
@@ -169,6 +172,7 @@ export default function PlanosPage() {
             ctaLabel="Assinar anual"
             highlight
             features={sharedPlanFeatures}
+            trackingEventName="plans_annual_clicked"
           />
         </div>
 
@@ -215,12 +219,14 @@ export default function PlanosPage() {
                 assinatura.
               </p>
             </div>
-            <a
+            <TrackedLink
               href={PLANS_LOGIN_URL}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white shadow-soft hover:bg-brand-700"
+              eventName="plans_access_classflow_clicked"
+              eventProperties={{ page: 'planos', cta: 'acessar_classflow' }}
             >
               Acessar ClassFlow
-            </a>
+            </TrackedLink>
           </div>
         </div>
       </Section>
@@ -237,6 +243,7 @@ function PricingCard(props: {
   features: string[]
   highlight?: boolean
   badge?: string
+  trackingEventName: string
 }) {
   const hasEmphasis = Boolean(props.highlight || props.badge)
 

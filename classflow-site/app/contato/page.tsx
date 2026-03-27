@@ -1,6 +1,7 @@
-import { Card, PrimaryButton } from '@/components/ui'
+import { Card } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
 import { CONTACT_ADDRESS, CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_TEL_URL, CONTACT_WHATSAPP_URL } from '@/lib/contact'
+import { TrackedLink } from '@/components/tracked-link'
 
 export const metadata = { title: 'Contato' }
 
@@ -21,9 +22,14 @@ export default function ContatoPage() {
               Envie sua mensagem com nome da escola, município, quantidade aproximada de turmas e os módulos que você quer ver na demonstração.
             </p>
             <div className="mt-4">
-              <a className="text-sm font-semibold text-brand-700 hover:underline" href={`mailto:${CONTACT_EMAIL}`}>
+              <TrackedLink
+                className="text-sm font-semibold text-brand-700 hover:underline"
+                href={`mailto:${CONTACT_EMAIL}`}
+                eventName="contact_email_clicked"
+                eventProperties={{ page: 'contato', channel: 'email' }}
+              >
                 {CONTACT_EMAIL}
-              </a>
+              </TrackedLink>
             </div>
           </Card>
 
@@ -33,12 +39,24 @@ export default function ContatoPage() {
               Ligue ou mande uma mensagem para agendar uma apresentação do fluxo de cadastros, grade, NEM, alunos e documentos.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold">
-              <a className="text-brand-700 hover:underline" href={CONTACT_TEL_URL}>
+              <TrackedLink
+                className="text-brand-700 hover:underline"
+                href={CONTACT_TEL_URL}
+                eventName="contact_phone_clicked"
+                eventProperties={{ page: 'contato', channel: 'telefone' }}
+              >
                 {CONTACT_PHONE_DISPLAY}
-              </a>
-              <a className="text-brand-700 hover:underline" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+              </TrackedLink>
+              <TrackedLink
+                className="text-brand-700 hover:underline"
+                href={CONTACT_WHATSAPP_URL}
+                target="_blank"
+                rel="noreferrer"
+                eventName="contact_whatsapp_clicked"
+                eventProperties={{ page: 'contato', channel: 'whatsapp' }}
+              >
                 Abrir no WhatsApp
-              </a>
+              </TrackedLink>
             </div>
           </Card>
 
@@ -56,7 +74,14 @@ export default function ContatoPage() {
         </div>
 
         <div className="mt-10">
-          <PrimaryButton href="/planos">Ver planos</PrimaryButton>
+          <TrackedLink
+            href="/planos"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white shadow-soft hover:bg-brand-700"
+            eventName="contact_view_plans_clicked"
+            eventProperties={{ page: 'contato', destination: 'planos' }}
+          >
+            Ver planos
+          </TrackedLink>
         </div>
       </Section>
     </div>

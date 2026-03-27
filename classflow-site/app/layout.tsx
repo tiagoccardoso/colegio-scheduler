@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 import { SiteFooter } from '@/components/site-footer'
 import { SiteHeader } from '@/components/site-header'
@@ -23,6 +24,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
+      <head>
+        <Script src="https://cdn.brevo.com/js/sdk-loader.js" strategy="afterInteractive" />
+        <Script id="brevo-tracker-init" strategy="afterInteractive">
+          {`
+            window.Brevo = window.Brevo || [];
+            window.Brevo.push([
+              "init",
+              {
+                client_key: "gf67s5p1k4iqnz7z65vlvfkf"
+              }
+            ]);
+          `}
+        </Script>
+      </head>
       <body className="min-h-screen antialiased">
         <SiteHeader />
         <main className="mx-auto max-w-6xl px-4 pb-20 pt-8 sm:px-6 lg:px-8">{children}</main>
