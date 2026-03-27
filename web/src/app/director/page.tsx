@@ -22,6 +22,15 @@ function cleanOptionalStateCode(value: FormDataEntryValue | null) {
   return /^[A-Z]{2}$/.test(stateCode) ? stateCode : null;
 }
 
+function cleanOptionalCnpj(value: FormDataEntryValue | null) {
+  const cnpj = String(value ?? "")
+    .trim()
+    .replace(/\D/g, "");
+
+  if (!cnpj) return null;
+  return cnpj.length === 14 ? cnpj : null;
+}
+
 type LogoPick = {
   path: string;
   version: string;
@@ -92,7 +101,7 @@ export default async function DirectorProfilePage({
 
   const { data: school } = await supabase
     .from("schools")
-    .select("id,name,public_enrollment_visible,zip_code,address_street,address_number,address_complement,address_neighborhood,city,state_code")
+    .select("id,name,cnpj,public_enrollment_visible,zip_code,address_street,address_number,address_complement,address_neighborhood,city,state_code")
     .eq("id", profile.school_id)
     .maybeSingle();
 
@@ -112,6 +121,8 @@ export default async function DirectorProfilePage({
 
     const full_name = String(formData.get("full_name") || "").trim();
     const school_name = String(formData.get("school_name") || "").trim();
+    const cnpj = cleanOptionalCnpj(formData.get("cnpj"));
+    const rawCnpj = String(formData.get("cnpj") || "").trim();
     const public_enrollment_visible = formData.get("public_enrollment_visible") === "on";
     const zip_code = cleanOptionalText(formData.get("zip_code"));
     const address_street = cleanOptionalText(formData.get("address_street"));
@@ -124,6 +135,7 @@ export default async function DirectorProfilePage({
 
     if (!full_name) redirect("/director?error=" + encodeMsg("Informe seu nome."));
     if (!school_name) redirect("/director?error=" + encodeMsg("Informe o nome do colégio."));
+    if (rawCnpj && !cnpj) redirect("/director?error=" + encodeMsg("Informe um CNPJ válido com 14 dígitos."));
 
     // Atualiza colégio
     const { error: schoolError } = await supabase
@@ -132,6 +144,7 @@ export default async function DirectorProfilePage({
         {
           id: profile.school_id,
           name: school_name,
+          cnpj,
           public_enrollment_visible,
           zip_code,
           address_street,
@@ -397,23 +410,18 @@ export default async function DirectorProfilePage({
 
           <section className="panel p-5">
             <h2 className="text-lg font-semibold">Colégio</h2>
-            <p className="muted mt-1 text-sm">Nome do colégio aparece em relatórios e impressões.</p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-1">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold">Nome do colégio</span>
-                <input name="school_name" defaultValue={(school as any)?.name ?? ""} className="input" />
-              </label>
-            </div>
+            <p className="muted mt-1 text-sm">Informe o CNPJ para tentar preencher automaticamente o nome e o endereço da escola.</p>
 
             <div className="mt-4 panel-inner p-4">
               <div>
-                <div className="text-sm font-semibold">Endereço da escola</div>
-                <p className="muted mt-1 text-sm">Preencha o endereço completo para manter o cadastro institucional atualizado.</p>
+                <div className="text-sm font-semibold">Cadastro institucional</div>
+                <p className="muted mt-1 text-sm">Você ainda pode revisar e editar manualmente todos os campos antes de salvar.</p>
               </div>
 
               <SchoolAddressFields
                 defaultValues={{
+                  cnpj: (school as any)?.cnpj ?? "",
+                  schoolName: (school as any)?.name ?? "",
                   zipCode: (school as any)?.zip_code ?? "",
                   street: (school as any)?.address_street ?? "",
                   number: (school as any)?.address_number ?? "",
