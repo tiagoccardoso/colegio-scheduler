@@ -172,6 +172,9 @@ export function Shell({
         />
       ) : null}
 
+      {/* Premium accent line at the very top */}
+      <div className="fixed inset-x-0 top-0 z-50 h-0.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 opacity-80" aria-hidden="true" />
+
       <header className={"sticky top-0 z-40 " + (isTopMenuVisible ? "pt-4" : "pt-2")}>
         <div className="page-container">
           <div
@@ -274,8 +277,13 @@ export function Shell({
       <main className="page-container py-6">
         {children}
 
-        <footer className="mt-10 text-center text-xs text-zinc-500 dark:text-zinc-500">
-          MVP — Colégio Scheduler
+        <footer className="mt-12 flex items-center justify-center gap-2 text-xs text-zinc-400 dark:text-zinc-600">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-gradient-to-br from-indigo-500 to-indigo-800 opacity-60">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M7 4h10a3 3 0 0 1 3 3v13a2 2 0 0 1-2 2H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z" stroke="white" strokeWidth="2.5"/>
+            </svg>
+          </span>
+          ClassFlow — Sistema de Gestão Escolar Premium
         </footer>
       </main>
     </div>

@@ -20,7 +20,8 @@ const config: Config = {
         }
       },
       boxShadow: {
-        soft: '0 12px 30px rgba(0,0,0,0.08)'
+        soft: '0 8px 24px rgba(67,56,202,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+        premium: '0 20px 60px rgba(67,56,202,0.14), 0 4px 16px rgba(0,0,0,0.06)'
       }
     }
   },
