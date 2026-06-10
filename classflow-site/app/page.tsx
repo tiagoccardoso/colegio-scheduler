@@ -52,7 +52,7 @@ export default function HomePage() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <PrimaryButton href="/produto">Conhecer o produto</PrimaryButton>
-            <SecondaryButton href="/contato">Pedir demonstração</SecondaryButton>
+            <SecondaryButton href="/planos">Ver planos</SecondaryButton>
             <a
               href={APP_URL}
               className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
@@ -126,7 +126,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton href="/contato">Pedir demonstração</PrimaryButton>
+            <PrimaryButton href="/planos">Ver planos</PrimaryButton>
             <SecondaryButton href="/planos">Ver planos</SecondaryButton>
           </div>
         </Card>

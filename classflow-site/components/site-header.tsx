@@ -10,7 +10,6 @@ const nav = [
   { href: '/planos', label: 'Planos' },
   { href: '/treinamentos', label: 'Treinamentos' },
   { href: '/matricula', label: 'Matrícula' },
-  { href: '/contato', label: 'Contato' },
 ]
 
 export function SiteHeader() {

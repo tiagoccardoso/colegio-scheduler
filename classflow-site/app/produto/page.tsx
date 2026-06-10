@@ -137,7 +137,7 @@ export default function ProdutoPage() {
 
         <div className="mt-10 flex flex-wrap gap-3">
           <PrimaryButton href="/planos">Ver planos</PrimaryButton>
-          <SecondaryButton href="/contato">Pedir demonstração</SecondaryButton>
+          <SecondaryButton href="/treinamentos">Ver treinamentos</SecondaryButton>
           <a
             href={APP_URL}
             className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"

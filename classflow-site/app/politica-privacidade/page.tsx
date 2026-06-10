@@ -1,5 +1,4 @@
 import { Card } from '@/components/ui'
-import { CONTACT_EMAIL } from '@/lib/contact'
 
 export const metadata = { title: 'Política de Privacidade' }
 
@@ -22,10 +21,6 @@ export default function PrivacidadePage() {
           <h2>Segurança</h2>
           <p>
             Aplicamos medidas técnicas e organizacionais razoáveis para proteger informações contra acesso não autorizado.
-          </p>
-          <h2>Contato</h2>
-          <p>
-            Para solicitações relacionadas à privacidade: {CONTACT_EMAIL}.
           </p>
         </div>
       </Card>

@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { Card } from '@/components/ui'
 import { Section, SectionTitle } from '@/components/section'
 import { getAllTrainings } from '@/lib/trainings'
-import { LiveDemoRequest } from '@/components/live-demo-request'
 
 export const metadata = {
   title: 'Treinamentos',
@@ -102,9 +101,6 @@ export default function TreinamentosPage() {
           </div>
         </div>
 
-        <div className="mt-10">
-          <LiveDemoRequest />
-        </div>
       </Section>
     </div>
   )
